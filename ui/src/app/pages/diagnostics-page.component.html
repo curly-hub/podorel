@@ -1,0 +1,146 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Diagnostics</span>
+      <h1>Diagnostics <app-help-tooltip [text]="helpTopics.page" label="Diagnostics help"></app-help-tooltip></h1>
+      <p>Runtime mode, health, correlation traces, and redacted support bundle output.</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="refresh()">
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </header>
+
+  @if (error) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error }}</mat-card-content>
+    </mat-card>
+  }
+
+  @if (devSupervisorWarning()) {
+    <mat-card class="warning-card">
+      <mat-card-content>
+        <mat-icon>warning</mat-icon>
+        <span>{{ devSupervisorWarning() }}</span>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <section class="hero-panel diagnostics-hero">
+    <div>
+      <h2>{{ runtime?.mode ?? 'unknown' }} runtime</h2>
+      <p>Backend {{ systemStatus?.active_backend_port || 'unknown port' }} · fallback {{ systemStatus?.fallback_mode || 'unknown' }} · agent {{ systemStatus?.primary_agent_health?.['status'] || 'unknown' }}. <app-help-tooltip [text]="helpTopics.page" label="Diagnostics layers help"></app-help-tooltip></p>
+    </div>
+  </section>
+
+  <mat-card>
+    <mat-tab-group>
+      <mat-tab label="Runtime">
+        <div class="tab-panel metric-grid">
+          <section class="runtime-tile">
+            <h2><mat-icon>toggle_on</mat-icon><span>Mode</span><app-help-tooltip [text]="helpTopics.mode" label="Runtime mode help"></app-help-tooltip></h2>
+            <strong>{{ runtime?.mode ?? 'unknown' }}</strong>
+          </section>
+          <section class="runtime-tile">
+            <h2><mat-icon>visibility</mat-icon><span>Raw Traces</span><app-help-tooltip [text]="helpTopics.rawTraces" label="Raw traces help"></app-help-tooltip></h2>
+            <strong>{{ runtime?.raw_traces_available ? 'Available' : 'Redacted' }}</strong>
+          </section>
+          <section class="runtime-tile">
+            <h2><mat-icon>health_and_safety</mat-icon><span>Health</span><app-help-tooltip [text]="helpTopics.health" label="Health help"></app-help-tooltip></h2>
+            <strong>{{ health?.['status'] ?? 'unknown' }}</strong>
+          </section>
+          <section class="runtime-tile">
+            <h2><mat-icon>dns</mat-icon><span>Agent</span><app-help-tooltip [text]="helpTopics.agent" label="Agent help"></app-help-tooltip></h2>
+            <strong>{{ systemStatus?.primary_agent_health?.['status'] ?? 'unknown' }}</strong>
+          </section>
+          <section class="runtime-tile">
+            <h2><mat-icon>cable</mat-icon><span>Fallback</span><app-help-tooltip [text]="helpTopics.fallback" label="Fallback help"></app-help-tooltip></h2>
+            <strong>{{ systemStatus?.fallback_mode ?? 'unknown' }}</strong>
+          </section>
+          <section class="runtime-tile" [class.warning]="devSupervisorWarning()">
+            <h2><mat-icon>settings_power</mat-icon><span>Supervisor</span><app-help-tooltip [text]="helpTopics.supervisor" label="Supervisor help"></app-help-tooltip></h2>
+            <strong>{{ devSupervisorStatus() }}</strong>
+            <small>{{ devSupervisorMode() }}</small>
+          </section>
+        </div>
+        <section class="raw-diagnostic-block">
+          <header><span>System status JSON</span><app-help-tooltip [text]="helpTopics.systemJson" label="System status JSON help"></app-help-tooltip></header>
+          <pre>{{ systemStatus | json }}</pre>
+        </section>
+        <section class="raw-diagnostic-block">
+          <header><span>Health JSON</span><app-help-tooltip [text]="helpTopics.healthJson" label="Health JSON help"></app-help-tooltip></header>
+          <pre>{{ health | json }}</pre>
+        </section>
+      </mat-tab>
+
+      <mat-tab label="Traces">
+        <div class="tab-panel filters">
+          <mat-form-field appearance="outline">
+            <mat-label>Correlation ID</mat-label>
+            <input matInput [(ngModel)]="correlationId">
+          </mat-form-field>
+          <app-help-tooltip [text]="helpTopics.correlationId" label="Correlation ID help"></app-help-tooltip>
+          <button mat-flat-button color="primary" type="button" (click)="loadTraces()">
+            <mat-icon>search</mat-icon>
+            Search
+          </button>
+        </div>
+        @if (redacted) {
+          <p class="redacted">Production mode redacts debug traces.</p>
+        }
+        <div class="trace-list">
+          @for (trace of traces; track trace.id) {
+            <article class="trace-row">
+              <div class="trace-title">
+                <mat-icon>data_object</mat-icon>
+                <div>
+                  <strong>{{ trace.operation }} · {{ trace.component }}</strong>
+                  <span>{{ trace.created_at | date: 'short' }} · {{ trace.correlation_id }}</span>
+                </div>
+              </div>
+              <div class="trace-meta">
+                <span>Agent {{ trace.agent_id || 'n/a' }}</span>
+                <span>{{ trace.target_type || 'target' }} {{ trace.target_id || 'n/a' }}</span>
+              </div>
+              <pre>{{ trace.trace | json }}</pre>
+            </article>
+          } @empty {
+            <p class="empty-state">No traces matched.</p>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Support">
+        <section class="support-warning">
+          <mat-icon>warning</mat-icon>
+          <div>
+            <strong>Review logs before sharing</strong>
+            <span>Logs can include hostnames, container names, image names, file paths, and correlation IDs. Use them for support, but avoid posting them publicly without checking the file.</span>
+          </div>
+        </section>
+        <div class="tab-panel filters">
+          <button mat-flat-button color="primary" type="button" (click)="downloadSupportLogs()" [disabled]="supportLogsBusy">
+            <mat-icon>download</mat-icon>
+            Get Logs
+          </button>
+          <app-help-tooltip [text]="helpTopics.supportLogs" label="Support logs help"></app-help-tooltip>
+          @if (supportLogsStatus) {
+            <span class="support-status">{{ supportLogsStatus }}</span>
+          }
+        </div>
+        <div class="tab-panel filters">
+          <mat-form-field appearance="outline">
+            <mat-label>Admin password confirmation</mat-label>
+            <input matInput type="password" [(ngModel)]="adminPassword">
+          </mat-form-field>
+          <app-help-tooltip [text]="helpTopics.bundle" label="Support bundle help"></app-help-tooltip>
+          <button mat-stroked-button type="button" (click)="createBundle()">
+            <mat-icon>inventory_2</mat-icon>
+            Create Bundle
+          </button>
+        </div>
+        <pre>{{ bundle | json }}</pre>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</section>

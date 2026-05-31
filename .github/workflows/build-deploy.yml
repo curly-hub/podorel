@@ -1,0 +1,47 @@
+name: Build PoDorel deploy bundle
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+
+jobs:
+  linux-amd64:
+    name: Linux amd64 deploy bundle
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Build deploy bundle
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME}-${GITHUB_SHA::7}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME}"
+          fi
+          PODOREL_VERSION="$version" scripts/build-deploy.sh --force
+
+      - name: Upload deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: podorel-deploy-linux-amd64
+          path: deploy/*.tar.gz
+          if-no-files-found: error

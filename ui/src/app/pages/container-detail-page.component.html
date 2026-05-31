@@ -1,0 +1,158 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Container Detail</span>
+      <h1>{{ container()?.name ?? 'Container Detail' }}</h1>
+      <p>{{ container()?.image ?? 'Loading container metadata' }}</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()">
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  @if (container()) {
+    <section class="hero-panel">
+      <div class="identity-row">
+        <div class="identity">
+          <span class="pod-avatar"><mat-icon>inventory_2</mat-icon></span>
+          <div>
+            <h2>{{ container()?.name }}</h2>
+            <p>{{ container()?.podman_container_id }}</p>
+          </div>
+        </div>
+        <mat-chip-set class="chip-row">
+          <mat-chip><mat-icon>radio_button_checked</mat-icon>{{ container()?.state }}</mat-chip>
+          <mat-chip><mat-icon>health_and_safety</mat-icon>{{ container()?.health || 'unknown' }}</mat-chip>
+          <mat-chip><mat-icon>apps</mat-icon>{{ container()?.pod_id }}</mat-chip>
+        </mat-chip-set>
+      </div>
+    </section>
+
+    <mat-card>
+      <mat-tab-group [selectedIndex]="selectedTabIndex()" (selectedIndexChange)="selectTab($event)">
+        <mat-tab label="Metadata">
+          <div class="tab-panel padded">
+            <dl class="metadata">
+              <div><dt>Agent</dt><dd>{{ container()?.agent_id }}</dd></div>
+              <div><dt>Podman ID</dt><dd>{{ container()?.podman_container_id }}</dd></div>
+              <div><dt>Created</dt><dd>{{ container()?.created_at | date: 'medium' }}</dd></div>
+              <div><dt>Observed</dt><dd>{{ container()?.observed_at | date: 'medium' }}</dd></div>
+            </dl>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Stats">
+          <div class="tab-panel padded">
+            @if (stats()) {
+              <mat-chip-set class="chip-row">
+                <mat-chip><mat-icon>speed</mat-icon>{{ formatCpu(stats()?.cpu_percent_host_total) }} CPU</mat-chip>
+                <mat-chip><mat-icon>memory</mat-icon>{{ stats()?.memory_podman_raw || formatMemory(stats()?.memory_bytes ?? 0) }}</mat-chip>
+                <mat-chip><mat-icon>schedule</mat-icon>{{ stats()?.sampled_at | date: 'medium' }}</mat-chip>
+              </mat-chip-set>
+              <pre>{{ stats() | json }}</pre>
+            } @else {
+              <p>Stats unavailable.</p>
+            }
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Logs">
+          <div class="tab-panel log-box">
+            @for (line of logs(); track line.timestamp + line.line) {
+              <code>{{ line.timestamp | date: 'mediumTime' }} {{ line.source }} {{ line.line }}</code>
+            }
+          </div>
+        </mat-tab>
+
+
+
+        <mat-tab label="Shell">
+          <div class="tab-panel padded shell-panel">
+            <section class="shell-warning">
+              <mat-icon>terminal</mat-icon>
+              <div>
+                <strong>Interactive container shell</strong>
+                <span>Commands run inside this container through the selected PoDorel agent. Shell open/close is audited, but command text is not stored.</span>
+              </div>
+            </section>
+
+            <div class="shell-toolbar">
+              <mat-form-field appearance="outline">
+                <mat-label>Shell</mat-label>
+                <mat-select [(ngModel)]="execShell" [disabled]="shellConnected() || shellConnecting()">
+                  <mat-option value="sh">sh</mat-option>
+                  <mat-option value="bash">bash</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-chip-set class="chip-row">
+                <mat-chip><mat-icon>{{ shellConnected() ? 'link' : 'link_off' }}</mat-icon>{{ shellStatus() }}</mat-chip>
+                <mat-chip><mat-icon>{{ execEnabled ? 'lock_open' : 'lock' }}</mat-icon>Exec {{ execEnabled ? 'enabled' : 'disabled' }}</mat-chip>
+              </mat-chip-set>
+              <span class="toolbar-spacer"></span>
+              <button mat-flat-button color="primary" type="button" (click)="openShell()" [disabled]="!canOpenShell()" [matTooltip]="execDisabledReason() || 'Open interactive shell'">
+                <mat-icon>terminal</mat-icon>
+                Open Shell
+              </button>
+              <button mat-stroked-button type="button" (click)="sendCtrlC()" [disabled]="!shellConnected()">
+                <mat-icon>keyboard_command_key</mat-icon>
+                Ctrl-C
+              </button>
+              <button mat-stroked-button type="button" (click)="clearShell()">
+                <mat-icon>backspace</mat-icon>
+                Clear
+              </button>
+              <button mat-stroked-button type="button" color="warn" (click)="closeShell()" [disabled]="!shellConnected() && !shellConnecting()">
+                <mat-icon>close</mat-icon>
+                Close
+              </button>
+            </div>
+
+            @if (execDisabledReason() && !shellConnected()) {
+              <p class="shell-hint">{{ execDisabledReason() }}</p>
+            }
+            @if (shellError()) {
+              <p class="shell-error"><mat-icon>error</mat-icon>{{ shellError() }}</p>
+            }
+
+            <div class="terminal-output" [class.connected]="shellConnected()" (click)="focusTerminal()">
+              <div #terminalHost class="terminal-host" aria-label="Interactive shell terminal"></div>
+            </div>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Actions">
+          <div class="tab-panel padded action-grid">
+            <button mat-flat-button color="primary" [disabled]="!canAction('start')" (click)="action('start')"><mat-icon>play_arrow</mat-icon>Start</button>
+            <button mat-stroked-button [disabled]="!canAction('stop')" (click)="action('stop')"><mat-icon>stop</mat-icon>Stop</button>
+            <button mat-stroked-button [disabled]="!canAction('restart')" (click)="action('restart')"><mat-icon>restart_alt</mat-icon>Restart</button>
+            <button mat-flat-button color="warn" [disabled]="!canAction('kill')" (click)="action('kill')"><mat-icon>dangerous</mat-icon>Kill</button>
+            <button mat-flat-button color="warn" [disabled]="!canAction('delete')" (click)="action('delete')"><mat-icon>delete</mat-icon>Delete</button>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Audit">
+          <div class="tab-panel padded">
+            <mat-list>
+              @for (event of audit(); track event.id) {
+                <mat-list-item>
+                  <mat-icon matListItemIcon>{{ event.result === 'success' ? 'check_circle' : 'error' }}</mat-icon>
+                  <span matListItemTitle>{{ event.action }} · {{ event.result }}</span>
+                  <span matListItemLine>{{ event.created_at | date: 'short' }} · {{ event.correlation_id }}</span>
+                </mat-list-item>
+              } @empty {
+                <mat-list-item>No audit events for this container.</mat-list-item>
+              }
+            </mat-list>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    </mat-card>
+  }
+</section>

@@ -1,0 +1,83 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Catalog</span>
+      <h1>Templates</h1>
+      <p>Schema-validated templates ready for pod creation.</p>
+    </div>
+    <button mat-flat-button color="primary" routerLink="/create-pod">
+      <mat-icon>add</mat-icon>
+      Create Pod
+    </button>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  <section class="hero-panel templates-hero">
+    <div>
+      <h2>{{ templates().length }} pod templates · {{ composeStacks().length }} compose stacks</h2>
+      <p>Review images, commands, declared ports, restart policy, and notes before provisioning.</p>
+    </div>
+  </section>
+
+  <div class="pod-grid">
+    @for (template of templates(); track template.id) {
+      <mat-card>
+        <mat-card-header>
+          <span mat-card-avatar class="pod-avatar"><mat-icon>view_module</mat-icon></span>
+          <mat-card-title>{{ template.name }}</mat-card-title>
+          <mat-card-subtitle>{{ template.id }} · {{ template.version }}</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p>{{ template.description }}</p>
+          <mat-chip-set class="chip-row">
+            <mat-chip><mat-icon>apps</mat-icon>{{ template.image }}</mat-chip>
+            <mat-chip><mat-icon>terminal</mat-icon>{{ commandLabel(template) }}</mat-chip>
+            <mat-chip><mat-icon>restart_alt</mat-icon>{{ template.restart_policy }}</mat-chip>
+            @for (port of template.ports; track port.host + '-' + port.container) {
+              <mat-chip><mat-icon>settings_ethernet</mat-icon>{{ port.host }}:{{ port.container }}/{{ port.protocol }}</mat-chip>
+            }
+          </mat-chip-set>
+        </mat-card-content>
+      </mat-card>
+    } @empty {
+      <mat-card>
+        <mat-card-content>No templates are available.</mat-card-content>
+      </mat-card>
+    }
+  </div>
+
+  <section class="section-heading">
+    <h2>Compose stacks</h2>
+  </section>
+
+  <div class="pod-grid">
+    @for (stack of composeStacks(); track stack.id) {
+      <mat-card>
+        <mat-card-header>
+          <span mat-card-avatar class="pod-avatar"><mat-icon>dynamic_feed</mat-icon></span>
+          <mat-card-title>{{ stack.name }}</mat-card-title>
+          <mat-card-subtitle>{{ stack.id }} · {{ stack.version }}</mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <p>{{ stack.description }}</p>
+          <mat-chip-set class="chip-row">
+            <mat-chip><mat-icon>folder</mat-icon>{{ stack.source_path }}</mat-chip>
+            @for (composeFile of stack.compose_files; track composeFile) {
+              <mat-chip><mat-icon>description</mat-icon>{{ composeFile }}</mat-chip>
+            }
+            <mat-chip><mat-icon>deployed_code</mat-icon>{{ composeServiceLabel(stack) }}</mat-chip>
+          </mat-chip-set>
+        </mat-card-content>
+      </mat-card>
+    } @empty {
+      <mat-card>
+        <mat-card-content>No compose stacks are available.</mat-card-content>
+      </mat-card>
+    }
+  </div>
+</section>

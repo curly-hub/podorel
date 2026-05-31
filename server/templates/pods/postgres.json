@@ -1,0 +1,44 @@
+{
+  "id": "postgres",
+  "version": "1.0.0",
+  "name": "PostgreSQL",
+  "description": "Single-container PostgreSQL pod with password supplied as a Podman secret.",
+  "image": "docker.io/library/postgres:16-alpine",
+  "ports": [
+    {
+      "host": 5432,
+      "container": 5432,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [
+    {
+      "host_path": "~/.local/share/podorel/pods/postgres/data",
+      "container_path": "/var/lib/postgresql/data",
+      "read_only": false
+    }
+  ],
+  "environment": {
+    "POSTGRES_USER": "podorel",
+    "POSTGRES_DB": "podorel"
+  },
+  "secrets": [
+    {
+      "name": "postgres-password",
+      "target": "POSTGRES_PASSWORD",
+      "required": true,
+      "description": "Database password stored as a Podman secret."
+    }
+  ],
+  "health_command": ["pg_isready", "-U", "podorel"],
+  "resource_limits": {
+    "cpu": "2",
+    "memory": "512MiB"
+  },
+  "restart_policy": "always",
+  "labels": {
+    "io.podorel.template": "postgres"
+  },
+  "ui_notes": ["Secret values are only used during creation and are not stored by PoDorel."]
+}
+

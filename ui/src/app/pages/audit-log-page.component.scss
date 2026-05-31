@@ -1,0 +1,34 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.limit-field {
+  max-width: 128px;
+}
+
+table {
+  width: 100%;
+}
+
+code {
+  white-space: pre-wrap;
+}
+
+.error-card {
+  border-left: 4px solid var(--danger);
+}
+
+.audit-hero {
+  min-height: 134px;
+}
+
+.filters {
+  align-items: end;
+}
+
+.table-wrap {
+  border: 0;
+  border-radius: var(--radius);
+}

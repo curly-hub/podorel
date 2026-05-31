@@ -1,0 +1,142 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">System</span>
+      <h1>Settings</h1>
+      <p>Authentication, logging, metrics, security scheduling, and automation controls.</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="load()">
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </header>
+
+  @if (accessedOverHttp) {
+    <mat-card class="warning-card">
+      <mat-card-content>
+        <mat-icon>warning</mat-icon>
+        HTTP access is enabled for v1. Use a trusted reverse proxy before exposing PoDorel outside a trusted LAN.
+      </mat-card-content>
+    </mat-card>
+  }
+
+  @if (error) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error }}</mat-card-content>
+    </mat-card>
+  }
+
+  <section class="hero-panel settings-hero">
+    <div>
+      <h2>{{ settings?.mode ?? 'runtime' }} settings</h2>
+      <p>Save changes with admin password confirmation. Sensitive actions remain behind the REST auth and CSRF flow.</p>
+    </div>
+    <mat-chip-set class="chip-row">
+      <mat-chip><mat-icon>terminal</mat-icon>Exec {{ execEnabled ? 'on' : 'off' }}</mat-chip>
+      <mat-chip><mat-icon>rule</mat-icon>Automation {{ automationEnabled ? 'on' : 'off' }}</mat-chip>
+      <mat-chip><mat-icon>security</mat-icon>Scans {{ scheduledScans ? 'scheduled' : 'manual' }}</mat-chip>
+    </mat-chip-set>
+  </section>
+
+  <div class="settings-grid">
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title><mat-icon>admin_panel_settings</mat-icon>Auth Settings</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Session TTL: {{ settings?.auth?.session_ttl ?? 'unknown' }}</p>
+        <p>Failed login limit: {{ settings?.auth?.failed_login_limit ?? 'unknown' }}</p>
+        <p>Failed login window: {{ settings?.auth?.failed_login_window ?? 'unknown' }}</p>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title><mat-icon>terminal</mat-icon>Actions</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="toggle-stack">
+        <mat-slide-toggle [(ngModel)]="execEnabled">Exec shell</mat-slide-toggle>
+        <mat-slide-toggle [(ngModel)]="automationEnabled">Automation rules</mat-slide-toggle>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title><mat-icon>monitoring</mat-icon>Metrics Retention</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline">
+          <mat-label>Hours</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="metricsRetentionHours">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title><mat-icon>article</mat-icon>Logs</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="form-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Retention hours</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="logsRetentionHours">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Per pod MB</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="logPerPodLimitMB">
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Total MB</mat-label>
+          <input matInput type="number" min="1" [(ngModel)]="logTotalLimitMB">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title><mat-icon>security</mat-icon>Security Scan Schedule</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="form-grid">
+        <mat-slide-toggle [(ngModel)]="scheduledScans">Scheduled scans</mat-slide-toggle>
+        <mat-form-field appearance="outline">
+          <mat-label>Schedule</mat-label>
+          <input matInput [(ngModel)]="securitySchedule">
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card>
+      <mat-card-header>
+        <mat-card-title><mat-icon>vpn_key</mat-icon>Agent Tokens</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Register and rotate agent-scoped login tokens from the Agents page.</p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title><mat-icon>save</mat-icon>Save Settings</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="form-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Admin password confirmation</mat-label>
+        <input matInput type="password" [(ngModel)]="adminPassword">
+      </mat-form-field>
+      <button mat-flat-button color="primary" type="button" (click)="save()">
+        <mat-icon>save</mat-icon>
+        Save
+      </button>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title><mat-icon>data_object</mat-icon>Current Settings</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <pre>{{ result || (settings | json) }}</pre>
+    </mat-card-content>
+  </mat-card>
+</section>

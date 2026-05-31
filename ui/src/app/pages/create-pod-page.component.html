@@ -1,0 +1,203 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Build</span>
+      <h1>Create Pod</h1>
+      <p>Provision from templates, preview Dockerfile imports, or register secret metadata.</p>
+    </div>
+  </header>
+
+  @if (error) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error }}</mat-card-content>
+    </mat-card>
+  }
+
+  <section class="hero-panel create-hero">
+    <div>
+      <h2>{{ selectedTemplate?.name ?? 'Choose a template' }}</h2>
+      <p>{{ selectedTemplate?.description ?? 'Built-in pod templates load from the PoDorel API.' }}</p>
+    </div>
+    <mat-chip-set class="chip-row">
+      <mat-chip><mat-icon>view_module</mat-icon>{{ templates.length }} templates</mat-chip>
+      <mat-chip><mat-icon>dynamic_feed</mat-icon>{{ composeStacks.length }} compose stacks</mat-chip>
+      <mat-chip><mat-icon>apps</mat-icon>{{ podName }}</mat-chip>
+      <mat-chip><mat-icon>dns</mat-icon>{{ agentId || 'default agent' }}</mat-chip>
+    </mat-chip-set>
+  </section>
+
+  <mat-card>
+    <mat-stepper>
+      <mat-step label="Template">
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Template</mat-label>
+            <mat-select [(ngModel)]="templateId">
+              @for (template of templates; track template.id) {
+                <mat-option [value]="template.id">{{ template.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Pod name</mat-label>
+            <input matInput [(ngModel)]="podName">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Agent ID</mat-label>
+            <input matInput placeholder="primary" [(ngModel)]="agentId">
+          </mat-form-field>
+        </div>
+        <mat-form-field appearance="outline" class="wide-field">
+          <mat-label>Template values JSON</mat-label>
+          <textarea matInput rows="3" [(ngModel)]="templateValuesText"></textarea>
+        </mat-form-field>
+
+        @if (selectedTemplate; as template) {
+          <section class="template-preview">
+            <header>
+              <div>
+                <h2>{{ template.name }}</h2>
+                <span>{{ template.image }}</span>
+              </div>
+            </header>
+            <p>{{ template.description }}</p>
+            <mat-chip-set class="chip-row">
+              <mat-chip><mat-icon>restart_alt</mat-icon>{{ template.restart_policy }}</mat-chip>
+              <mat-chip><mat-icon>speed</mat-icon>{{ template.resource_limits.cpu || 'CPU default' }}</mat-chip>
+              <mat-chip><mat-icon>memory</mat-icon>{{ template.resource_limits.memory || 'Memory default' }}</mat-chip>
+            </mat-chip-set>
+          </section>
+        }
+
+        <div class="actions">
+          <button mat-stroked-button type="button" (click)="preview()"><mat-icon>visibility</mat-icon>Preview</button>
+          <button mat-flat-button color="primary" type="button" (click)="create()"><mat-icon>add</mat-icon>Create</button>
+        </div>
+      </mat-step>
+
+      <mat-step label="Compose">
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Compose stack</mat-label>
+            <mat-select [(ngModel)]="composeStackId" (selectionChange)="composeProjectName = $event.value">
+              @for (stack of composeStacks; track stack.id) {
+                <mat-option [value]="stack.id">{{ stack.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Project name</mat-label>
+            <input matInput [(ngModel)]="composeProjectName">
+          </mat-form-field>
+        </div>
+
+        @if (selectedComposeStack; as stack) {
+          <section class="template-preview">
+            <header>
+              <div>
+                <h2>{{ stack.name }}</h2>
+                <span>{{ stack.source_path }}</span>
+              </div>
+            </header>
+            <p>{{ stack.description }}</p>
+            <mat-chip-set class="chip-row">
+              @for (composeFile of stack.compose_files; track composeFile) {
+                <mat-chip><mat-icon>description</mat-icon>{{ composeFile }}</mat-chip>
+              }
+              @for (service of stack.services; track service.name) {
+                <mat-chip><mat-icon>deployed_code</mat-icon>{{ service.name }}</mat-chip>
+              }
+            </mat-chip-set>
+            <ul>
+              @for (note of stack.notes; track note) {
+                <li>{{ note }}</li>
+              }
+            </ul>
+          </section>
+        }
+
+        <div class="actions">
+          <button mat-stroked-button type="button" (click)="composePreview()"><mat-icon>visibility</mat-icon>Preview Stack</button>
+          <button mat-flat-button color="primary" type="button" (click)="composeDeploy()"><mat-icon>publish</mat-icon>Deploy Stack</button>
+        </div>
+      </mat-step>
+
+      <mat-step label="Advanced">
+        <mat-chip-set class="chip-row">
+          @for (port of selectedTemplate?.ports ?? []; track port.host + '-' + port.container) {
+            <mat-chip><mat-icon>settings_ethernet</mat-icon>{{ port.host }}:{{ port.container }}/{{ port.protocol }}</mat-chip>
+          } @empty {
+            <mat-chip><mat-icon>block</mat-icon>No declared ports</mat-chip>
+          }
+          @for (secret of selectedTemplate?.secrets ?? []; track secret.name) {
+            <mat-chip><mat-icon>key</mat-icon>{{ secret.name }} {{ secret.required ? 'required' : 'optional' }}</mat-chip>
+          }
+        </mat-chip-set>
+        <mat-divider></mat-divider>
+        <ul>
+          @for (note of selectedTemplate?.ui_notes ?? []; track note) {
+            <li>{{ note }}</li>
+          }
+        </ul>
+      </mat-step>
+
+      <mat-step label="Dockerfile">
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Image</mat-label>
+            <input matInput [(ngModel)]="imageName">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Password confirmation</mat-label>
+            <input matInput type="password" [(ngModel)]="buildPassword">
+          </mat-form-field>
+        </div>
+        <mat-form-field appearance="outline" class="wide-field">
+          <mat-label>Dockerfile</mat-label>
+          <textarea matInput rows="10" [(ngModel)]="dockerfile"></textarea>
+        </mat-form-field>
+        <div class="actions">
+          <button mat-stroked-button type="button" (click)="buildPreview()"><mat-icon>visibility</mat-icon>Preview Build</button>
+          <button mat-flat-button color="primary" type="button" (click)="buildConfirm()"><mat-icon>build</mat-icon>Build</button>
+        </div>
+      </mat-step>
+
+      <mat-step label="Secrets">
+        @if (accessedOverHttp) {
+          <div class="warning">
+            <mat-icon>warning</mat-icon>
+            <span>This HTTP-only v1 session should be protected by a trusted reverse proxy before entering production secrets.</span>
+          </div>
+        }
+        <div class="form-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Secret name</mat-label>
+            <input matInput [(ngModel)]="secretName">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Used by pod ID</mat-label>
+            <input matInput [(ngModel)]="secretPodId">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Password confirmation</mat-label>
+            <input matInput type="password" [(ngModel)]="secretPassword">
+          </mat-form-field>
+        </div>
+        <mat-form-field appearance="outline" class="wide-field">
+          <mat-label>Secret value</mat-label>
+          <textarea matInput rows="4" [(ngModel)]="secretValue"></textarea>
+        </mat-form-field>
+        <button mat-flat-button color="primary" type="button" (click)="createSecret()"><mat-icon>key</mat-icon>Create Secret Metadata</button>
+      </mat-step>
+
+      <mat-step label="Result">
+        @if (buildStreamStatus) {
+          <mat-chip-set class="chip-row">
+            <mat-chip><mat-icon>terminal</mat-icon>{{ buildStreamStatus }}</mat-chip>
+          </mat-chip-set>
+        }
+        <pre>{{ result || 'No preview or action result yet.' }}</pre>
+      </mat-step>
+    </mat-stepper>
+  </mat-card>
+</section>

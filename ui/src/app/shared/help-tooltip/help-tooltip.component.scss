@@ -1,0 +1,37 @@
+:host {
+  align-items: center;
+  display: inline-flex;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.help-tooltip {
+  align-items: center;
+  color: var(--muted);
+  cursor: help;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 16px;
+  justify-content: center;
+  margin-left: 2px;
+  outline: none;
+  transform: translateY(-1px);
+  width: 16px;
+}
+
+.help-tooltip:focus-visible {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--selection-bg);
+  color: var(--brand-strong);
+}
+
+.help-tooltip:hover {
+  color: var(--brand-strong);
+}
+
+.help-tooltip mat-icon {
+  font-size: 14px;
+  height: 14px;
+  line-height: 14px;
+  width: 14px;
+}

@@ -1,0 +1,271 @@
+.shell {
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+.auth-shell {
+  background: var(--bg);
+}
+
+.nav {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  width: 276px;
+}
+
+.brand-block {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  min-height: 76px;
+  padding: 16px 18px;
+}
+
+.brand-block > div,
+.nav-footer > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.brand-block strong {
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.brand-block span:not(.brand-mark),
+.nav-footer span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.brand-mark {
+  height: 36px;
+  width: 36px;
+}
+
+.brand-mark mat-icon {
+  font-size: 20px;
+  height: 20px;
+  width: 20px;
+}
+
+.brand-mark img {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.nav-groups {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 14px 10px;
+}
+
+.nav-section {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.nav-section h2 {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 8px 12px 4px;
+}
+
+.nav a {
+  border-radius: var(--radius);
+  color: var(--text-soft);
+  height: 42px;
+  margin: 2px 0;
+  width: 100%;
+}
+
+.nav a mat-icon {
+  color: var(--muted);
+  font-size: 20px;
+  height: 20px;
+  margin: 0 12px 0 0;
+  width: 20px;
+}
+
+.active-link {
+  background: var(--brand-soft);
+  color: var(--brand-strong);
+  font-weight: 800;
+}
+
+.active-link mat-icon {
+  color: var(--brand);
+}
+
+.nav-footer {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.nav-footer strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.main-surface {
+  background: transparent;
+  min-height: 100vh;
+}
+
+.topbar {
+  background: var(--surface) !important;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(21, 35, 33, .04);
+  color: var(--text) !important;
+  gap: 10px;
+  min-height: 68px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.topbar-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.topbar-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.topbar-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.content {
+  margin: 0 auto;
+  max-width: 1480px;
+  padding: 26px;
+  width: 100%;
+}
+
+.auth-content {
+  max-width: none;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.user-label {
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 700;
+  margin-right: 4px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-button {
+  min-width: 106px;
+}
+
+@media (max-width: 900px) {
+  .topbar-copy small {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .nav {
+    width: 236px;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .auth-content {
+    padding: 0;
+  }
+
+  .user-label {
+    display: none;
+  }
+
+  .auth-button {
+    min-width: 44px;
+  }
+}
+
+/* Shell polish: calmer navigation and clearer active/hover states. */
+.nav {
+  background: var(--nav-bg);
+  box-shadow: inset -1px 0 0 var(--border);
+}
+
+.brand-block {
+  background: var(--surface);
+}
+
+.brand-mark {
+  box-shadow: 0 8px 18px rgba(var(--brand-rgb), .18);
+}
+
+.nav a {
+  font-weight: 700;
+  transition: background-color .16s ease, color .16s ease;
+}
+
+.nav a:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.nav a:hover mat-icon {
+  color: var(--brand-strong);
+}
+
+.active-link {
+  background: var(--brand-soft) !important;
+  box-shadow: inset 3px 0 0 var(--brand);
+  color: var(--brand-strong) !important;
+}
+
+.nav-footer {
+  background: var(--surface);
+}
+
+.topbar {
+  backdrop-filter: blur(10px);
+  background: var(--topbar-bg) !important;
+  min-height: 64px;
+}
+
+.topbar-title {
+  color: var(--text);
+}
+
+.content {
+  padding: 22px;
+}
+
+@media (max-width: 760px) {
+  .content {
+    padding: 14px;
+  }
+}
+

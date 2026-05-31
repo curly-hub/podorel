@@ -1,0 +1,304 @@
+<section class="page security-page">
+  <header class="page-header security-header">
+    <div class="page-title">
+      <span class="eyebrow">Security</span>
+      <h1>Security <app-help-tooltip [text]="helpTopics.page" label="Security help"></app-help-tooltip></h1>
+      <p>Scanner readiness, image vulnerabilities, digest drift, and host package updates.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button type="button" (click)="refresh()" [disabled]="scanning()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+      <button mat-flat-button color="primary" type="button" (click)="scan()" [disabled]="scanning() || scannerUnavailable() || scannerUnsafe()">
+        <mat-icon>{{ scanning() ? 'sync' : 'security' }}</mat-icon>
+        {{ scanning() ? 'Scanning' : 'Rescan' }}
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  <section class="security-overview">
+    <mat-card class="scanner-status-card" [class.setup-needed]="scannerUnavailable()" [class.unsafe]="scannerUnsafe()" [class.ready]="scannerReady() && !scannerUnsafe()">
+      <mat-card-content>
+        <div class="status-layout">
+          <span class="status-emblem"><mat-icon>{{ statusIcon() }}</mat-icon></span>
+          <div>
+            <span class="eyebrow">Scanner <app-help-tooltip [text]="helpTopics.scanner" label="Scanner help"></app-help-tooltip></span>
+            <h2>{{ scannerStatusLabel() }}</h2>
+            <p>{{ scannerDetail() }}</p>
+          </div>
+        </div>
+
+        <dl class="fact-grid">
+          <div>
+            <dt>Scanner <app-help-tooltip [text]="helpTopics.scanner" label="Scanner help"></app-help-tooltip></dt>
+            <dd>{{ scannerOptions()?.scanner || summary()?.scanner || 'trivy' }}</dd>
+          </div>
+          <div>
+            <dt>Version <app-help-tooltip [text]="helpTopics.versionSafety" label="Scanner version help"></app-help-tooltip></dt>
+            <dd><span [class]="scannerVersionClass()"><mat-icon>{{ scannerVersionIcon() }}</mat-icon>{{ scannerVersionSafety().label }}</span></dd>
+          </div>
+          <div>
+            <dt>Last scan <app-help-tooltip [text]="helpTopics.lastScan" label="Last scan help"></app-help-tooltip></dt>
+            <dd>{{ latestScanRecord()?.finished_at ? (latestScanRecord()?.finished_at | date: 'short') : 'Not scanned' }}</dd>
+          </div>
+          <div>
+            <dt>Digest checks <app-help-tooltip [text]="helpTopics.digest" label="Digest checks help"></app-help-tooltip></dt>
+            <dd>{{ summary()?.image_digest || 'Unknown' }}</dd>
+          </div>
+          <div>
+            <dt>Host packages <app-help-tooltip [text]="helpTopics.hostPackages" label="Host packages help"></app-help-tooltip></dt>
+            <dd>{{ summary()?.host_packages || 'Unknown' }}</dd>
+          </div>
+        </dl>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="install-guide-card">
+      <mat-card-header>
+        <mat-card-title><mat-icon>terminal</mat-icon>Scanner Instructions <app-help-tooltip [text]="helpTopics.installOptions" label="Scanner instructions help"></app-help-tooltip></mat-card-title>
+        <mat-card-subtitle>
+          @if (scannerReady()) {
+            Scanner path is configured and reachable.
+          } @else {
+            Install Trivy on the host running PoDorel, then refresh this page.
+          }
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <ol class="setup-steps">
+          @for (step of setupSteps(); track step) {
+            <li>{{ step }}</li>
+          }
+        </ol>
+        @if ((!scannerReady() || scannerUnsafe()) && recommendedScannerOption(); as option) {
+          <section class="primary-command">
+            <header>
+              <span><mat-icon>terminal</mat-icon>{{ option.title }}</span>
+              <mat-chip>{{ scannerInstallStatus(option) }}</mat-chip>
+            </header>
+            <pre class="command-block">{{ option.command }}</pre>
+            <button mat-stroked-button type="button" (click)="copyCommand(option)">
+              <mat-icon>content_copy</mat-icon>
+              Copy command
+            </button>
+          </section>
+        }
+      </mat-card-content>
+    </mat-card>
+  </section>
+
+  @if (scannerReady()) {
+    <mat-card class="version-safety-card" [class.unsafe]="scannerUnsafe()">
+      <mat-card-header>
+        <mat-card-title><mat-icon>{{ scannerVersionIcon() }}</mat-icon>Scanner Version <app-help-tooltip [text]="helpTopics.versionSafety" label="Scanner version safety help"></app-help-tooltip></mat-card-title>
+        <mat-card-subtitle>{{ scannerVersionSafety().detail }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <pre class="command-block">{{ verificationCommand() }}</pre>
+        <button mat-stroked-button type="button" (click)="copyVerificationCommand()">
+          <mat-icon>content_copy</mat-icon>
+          Copy verification command
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card class="install-options-card" [class.ready]="scannerReady() && !scannerUnsafe()" [class.unsafe]="scannerUnsafe()">
+    <mat-card-header>
+      <mat-card-title><mat-icon>download</mat-icon>Install Options <app-help-tooltip [text]="helpTopics.installOptions" label="Install options help"></app-help-tooltip></mat-card-title>
+      <mat-card-subtitle>
+        @if (scannerOptions()?.scanner_available) {
+          {{ scannerOptions()?.scanner }} {{ scannerVersionLabel() }} is available at {{ scannerOptions()?.scanner_path }}
+        } @else {
+          {{ scannerOptions()?.scanner || 'trivy' }} is not available to the web process
+        }
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      @if (scannerInstallOptions().length) {
+        <div class="scanner-option-grid">
+          @for (option of scannerInstallOptions(); track option.id) {
+            <article class="scanner-option" [class.recommended]="option.id === recommendedScannerOptionId()" [class.detected]="scannerReady() && option.id === 'custom-scanner-path'">
+              <header>
+                <span>
+                  <mat-icon>{{ optionIcon(option) }}</mat-icon>
+                  {{ option.title }}
+                </span>
+                <mat-chip>{{ scannerInstallStatus(option) }}</mat-chip>
+              </header>
+              <p>{{ option.description }}</p>
+              <pre class="command-block">{{ option.command }}</pre>
+              <div class="option-actions">
+                <button mat-stroked-button type="button" (click)="copyCommand(option)">
+                  <mat-icon>content_copy</mat-icon>
+                  Copy command
+                </button>
+                <a mat-button [href]="option.docs_url" target="_blank" rel="noreferrer">
+                  <mat-icon>open_in_new</mat-icon>
+                  Docs
+                </a>
+              </div>
+            </article>
+          }
+        </div>
+      } @else {
+        <p class="empty-state">No scanner install options are available.</p>
+      }
+    </mat-card-content>
+  </mat-card>
+
+  @if (scannerErrors()) {
+    <mat-card class="error-card">
+      <mat-card-header>
+        <mat-card-title><mat-icon>error</mat-icon>Scanner Error</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>{{ scannerErrors() }}</mat-card-content>
+    </mat-card>
+  }
+
+  <section class="summary-grid security-summary-grid">
+    @for (item of severitySummary(); track item.key) {
+      <article [class]="severityTileClass(item)">
+        <span>{{ item.label }} <app-help-tooltip [text]="helpTopics.severity" label="Severity help"></app-help-tooltip></span>
+        <strong>{{ item.value }}</strong>
+      </article>
+    }
+  </section>
+
+  <div class="metric-grid security-metrics">
+    <article class="metric-card">
+      <header><span><mat-icon>bug_report</mat-icon>Findings <app-help-tooltip [text]="helpTopics.findings" label="Findings help"></app-help-tooltip></span></header>
+      <strong class="metric-value compact-value">{{ findingCountLabel() }}</strong>
+      <span class="metric-subtitle">Stored CVE findings from the latest scan data</span>
+    </article>
+    <article class="metric-card">
+      <header><span><mat-icon>fingerprint</mat-icon>Image Digests <app-help-tooltip [text]="helpTopics.imageDigests" label="Image digests help"></app-help-tooltip></span></header>
+      <strong class="metric-value compact-value">{{ digestIssueCountLabel() }}</strong>
+      <span class="metric-subtitle">Remote digest comparison results</span>
+    </article>
+    <article class="metric-card">
+      <header><span><mat-icon>system_update</mat-icon>Host Updates <app-help-tooltip [text]="helpTopics.hostUpdates" label="Host updates help"></app-help-tooltip></span></header>
+      <strong class="metric-value compact-value">{{ hostUpdateCountLabel() }}</strong>
+      <span class="metric-subtitle">Podman-related package updates detected on host</span>
+    </article>
+    <article class="metric-card">
+      <header><span><mat-icon>event_repeat</mat-icon>Schedule <app-help-tooltip [text]="helpTopics.schedule" label="Schedule help"></app-help-tooltip></span></header>
+      <strong class="metric-value compact-value">{{ summary()?.scheduled_scans ? 'Enabled' : 'Manual' }}</strong>
+      <span class="metric-subtitle">Last status: {{ latestScanRecord()?.status || summary()?.status || 'unknown' }}</span>
+    </article>
+  </div>
+
+  <section class="security-data-grid">
+    <mat-card class="data-card findings-card">
+      <mat-card-header>
+        <mat-card-title><mat-icon>bug_report</mat-icon>Findings <app-help-tooltip [text]="helpTopics.findings" label="Findings help"></app-help-tooltip></mat-card-title>
+        <mat-card-subtitle>{{ findingCountLabel() }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="table-wrap">
+          <table mat-table [dataSource]="findings()">
+            <ng-container matColumnDef="severity">
+              <th mat-header-cell *matHeaderCellDef>Severity</th>
+              <td mat-cell *matCellDef="let finding"><span [class]="findingSeverityClass(finding)">{{ finding.severity || 'unknown' }}</span></td>
+            </ng-container>
+            <ng-container matColumnDef="vulnerability">
+              <th mat-header-cell *matHeaderCellDef>CVE</th>
+              <td mat-cell *matCellDef="let finding">
+                <strong>{{ finding.vulnerability_id || 'n/a' }}</strong>
+                <span class="cell-subtitle">{{ finding.title || 'No title recorded' }}</span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="target">
+              <th mat-header-cell *matHeaderCellDef>Target</th>
+              <td mat-cell *matCellDef="let finding">{{ finding.target || finding.image_digest || 'n/a' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="package">
+              <th mat-header-cell *matHeaderCellDef>Package</th>
+              <td mat-cell *matCellDef="let finding">{{ finding.package_name || 'n/a' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="fixed">
+              <th mat-header-cell *matHeaderCellDef>Fixed</th>
+              <td mat-cell *matCellDef="let finding">{{ finding.fixed_version || 'n/a' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="displayedFindingColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedFindingColumns;"></tr>
+          </table>
+        </div>
+        @if (!findings().length) {
+          <p class="empty-state">No findings recorded.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="data-card">
+      <mat-card-header>
+        <mat-card-title><mat-icon>fingerprint</mat-icon>Image Digests <app-help-tooltip [text]="helpTopics.imageDigests" label="Image digests help"></app-help-tooltip></mat-card-title>
+        <mat-card-subtitle>{{ digestIssueCountLabel() }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="table-wrap">
+          <table mat-table [dataSource]="imageDigests()">
+            <ng-container matColumnDef="image">
+              <th mat-header-cell *matHeaderCellDef>Image</th>
+              <td mat-cell *matCellDef="let digest">{{ digest.image_name }}</td>
+            </ng-container>
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef>Status</th>
+              <td mat-cell *matCellDef="let digest"><span [class]="digestStatusClass(digest)">{{ digestStatus(digest) }}</span></td>
+            </ng-container>
+            <ng-container matColumnDef="checked">
+              <th mat-header-cell *matHeaderCellDef>Checked</th>
+              <td mat-cell *matCellDef="let digest">{{ digest.checked_at | date: 'short' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="displayedDigestColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedDigestColumns;"></tr>
+          </table>
+        </div>
+        @if (!imageDigests().length) {
+          <p class="empty-state">No digest checks recorded.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="data-card">
+      <mat-card-header>
+        <mat-card-title><mat-icon>system_update</mat-icon>Host Package Updates <app-help-tooltip [text]="helpTopics.hostUpdates" label="Host package updates help"></app-help-tooltip></mat-card-title>
+        <mat-card-subtitle>{{ hostUpdateCountLabel() }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="table-wrap">
+          <table mat-table [dataSource]="hostUpdates()">
+            <ng-container matColumnDef="package">
+              <th mat-header-cell *matHeaderCellDef>Package</th>
+              <td mat-cell *matCellDef="let update">{{ update.package_name }}</td>
+            </ng-container>
+            <ng-container matColumnDef="installed">
+              <th mat-header-cell *matHeaderCellDef>Installed</th>
+              <td mat-cell *matCellDef="let update">{{ update.installed_version || 'n/a' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="available">
+              <th mat-header-cell *matHeaderCellDef>Available</th>
+              <td mat-cell *matCellDef="let update"><span [class]="packageStatusClass(update)">{{ update.available_version || 'n/a' }}</span></td>
+            </ng-container>
+            <ng-container matColumnDef="checked">
+              <th mat-header-cell *matHeaderCellDef>Checked</th>
+              <td mat-cell *matCellDef="let update">{{ update.checked_at | date: 'short' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="displayedPackageColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedPackageColumns;"></tr>
+          </table>
+        </div>
+        @if (!hostUpdates().length) {
+          <p class="empty-state">No host package updates recorded.</p>
+        }
+      </mat-card-content>
+    </mat-card>
+  </section>
+</section>

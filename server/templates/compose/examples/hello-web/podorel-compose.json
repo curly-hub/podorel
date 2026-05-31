@@ -1,0 +1,25 @@
+{
+  "id": "example-hello-web",
+  "version": "1.0.0",
+  "name": "Hello Web Compose",
+  "description": "Small Compose example that runs a single Nginx web container.",
+  "source_path": "server/templates/compose/examples/hello-web",
+  "compose_files": ["docker-compose.yml"],
+  "services": [
+    {
+      "name": "web",
+      "image": "docker.io/library/nginx:1.27-alpine",
+      "container_name": "podorel-hello-web",
+      "restart": "unless-stopped",
+      "ports": ["${HELLO_WEB_PORT:-8088}:80"]
+    }
+  ],
+  "environment_files": [".env.example"],
+  "required_files": [],
+  "notes": [
+    "Copy .env.example to .env if you want to change the host port before deployment."
+  ],
+  "labels": {
+    "io.podorel.example": "true"
+  }
+}

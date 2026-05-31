@@ -1,0 +1,10 @@
+FROM docker.io/library/debian:12-slim
+LABEL org.opencontainers.image.title="PoDorel Web"
+LABEL org.opencontainers.image.description="PoDorel web/API server and Angular UI"
+WORKDIR /app
+COPY bin/podorel-web /usr/local/bin/podorel-web
+COPY server/migrations /app/server/migrations
+COPY server/templates /app/server/templates
+COPY ui /app/ui
+EXPOSE 8080
+CMD ["podorel-web", "--production", "--db-path", "/app/data/podorel.db", "--ui-dist-path", "/app/ui"]

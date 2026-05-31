@@ -1,0 +1,137 @@
+.auth-page {
+  align-items: center;
+  display: grid;
+  gap: 36px;
+  grid-template-columns: minmax(280px, 480px) minmax(320px, 520px);
+  min-height: 100vh;
+  padding: 42px;
+}
+
+.auth-copy {
+  display: grid;
+  gap: 18px;
+}
+
+.brand-lockup {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+}
+
+.auth-copy h1 {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0;
+}
+
+.auth-copy p {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.brand-mark {
+  align-items: center;
+  background: var(--brand);
+  border-radius: var(--radius);
+  color: var(--surface);
+  display: flex;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.brand-mark img {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.auth-card {
+  border-top: 4px solid var(--brand);
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+  padding-top: 18px;
+}
+
+.error-banner,
+.scoped-warning,
+.dev-hint {
+  align-items: center;
+  border-radius: 8px;
+  display: flex;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px;
+}
+
+.auth-signals {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.auth-signals span {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-soft);
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.auth-signals mat-icon {
+  color: var(--brand);
+}
+
+@media (max-width: 900px) {
+  .auth-page {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding: 24px;
+  }
+
+  .auth-copy h1 {
+    font-size: 34px;
+  }
+}
+
+.auth-page {
+  background:
+    linear-gradient(135deg, rgba(var(--brand-rgb), .10), var(--hero-accent-bg) 48%, rgba(255, 255, 255, .40)),
+    var(--bg);
+}
+
+.auth-copy {
+  max-width: 520px;
+}
+
+.auth-copy h1 {
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.auth-copy p {
+  color: var(--text-soft);
+}
+
+.auth-card {
+  border: 1px solid var(--border) !important;
+  border-top: 4px solid var(--brand) !important;
+  max-width: 520px;
+  width: 100%;
+}
+
+.auth-signals span {
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+

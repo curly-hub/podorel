@@ -1,0 +1,23 @@
+FROM docker.io/library/golang:1.22-alpine AS build
+WORKDIR /src
+RUN apk add --no-cache build-base
+COPY . .
+RUN go build -o /out/podorel-web ./server/cmd/podorel-web
+
+FROM docker.io/library/node:24-alpine AS ui-build
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci
+COPY ui ./
+RUN npm run build
+
+FROM docker.io/library/alpine:3.20
+LABEL org.opencontainers.image.title="PoDorel Web"
+LABEL org.opencontainers.image.description="PoDorel web/API server and Angular UI"
+WORKDIR /app
+COPY --from=build /out/podorel-web /usr/local/bin/podorel-web
+COPY server/migrations /app/server/migrations
+COPY server/templates /app/server/templates
+COPY --from=ui-build /ui/dist/podorel-ui/browser /app/ui
+EXPOSE 8080
+CMD ["podorel-web", "--production", "--db-path", "/app/data/podorel.db", "--ui-dist-path", "/app/ui"]

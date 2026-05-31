@@ -1,0 +1,95 @@
+.dashboard-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+mat-card-title {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.metric-grid mat-card {
+  background:
+    linear-gradient(180deg, rgba(0, 122, 124, .05), rgba(0, 122, 124, 0) 58%),
+    var(--surface);
+  min-height: 132px;
+}
+
+.metric-grid strong {
+  display: block;
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 14px 0 4px;
+}
+
+mat-list {
+  padding: 4px 0 8px;
+}
+
+.error-card {
+  border-left: 4px solid var(--danger);
+}
+
+.identity-row {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.identity-row h2 {
+  margin: 0;
+}
+
+.identity-row mat-chip-set {
+  justify-content: flex-end;
+}
+
+.dashboard-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.metric-grid .metric-value {
+  margin: 0;
+}
+
+@media (max-width: 960px) {
+  .identity-row,
+  .dashboard-grid {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .identity-row mat-chip-set {
+    justify-content: flex-start;
+  }
+}
+
+.warning-card {
+  border-left: 4px solid var(--warning);
+}
+
+.warning-card mat-card-content {
+  align-items: flex-start;
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+}
+
+.warning-card mat-icon {
+  color: var(--warning);
+  flex: 0 0 auto;
+}
+
+.warning-card strong,
+.warning-card span {
+  display: block;
+}
+
+.warning-card span {
+  color: var(--text-soft);
+  margin-top: 2px;
+}

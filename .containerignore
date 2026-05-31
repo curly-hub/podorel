@@ -1,0 +1,17 @@
+.podorel
+reports
+ui/node_modules
+ui/dist
+ui/.angular
+bin
+dist
+coverage
+*.log
+*.db
+*.sqlite
+*.sqlite-*
+*.sock
+.env
+.env.*
+!.env.example
+!.env.sample

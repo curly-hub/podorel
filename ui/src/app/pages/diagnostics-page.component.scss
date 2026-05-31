@@ -1,0 +1,183 @@
+.tab-panel {
+  padding: 18px 0 4px;
+}
+
+.filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.runtime-tile {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.runtime-tile h2 {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.runtime-tile strong {
+  display: block;
+  font-size: 26px;
+  margin-top: 12px;
+}
+
+.runtime-tile small {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  margin-top: 6px;
+}
+
+.runtime-tile.warning {
+  border-color: color-mix(in srgb, var(--warning) 35%, var(--border));
+}
+
+.runtime-tile.warning h2 mat-icon,
+.runtime-tile.warning strong {
+  color: var(--warning);
+}
+
+.redacted {
+  color: var(--warning);
+}
+
+.trace-list {
+  display: grid;
+  gap: 12px;
+}
+
+.trace-row {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.trace-title {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.trace-title mat-icon {
+  color: var(--brand);
+}
+
+.trace-title strong,
+.trace-title span {
+  display: block;
+}
+
+.trace-title span,
+.trace-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trace-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.empty-state {
+  color: var(--muted);
+}
+
+
+.raw-diagnostic-block {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.raw-diagnostic-block header {
+  align-items: center;
+  color: var(--muted-strong);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 4px;
+}
+
+pre {
+  margin: 0;
+  overflow: auto;
+}
+
+.error-card {
+  border-left: 4px solid var(--danger);
+}
+
+.warning-card {
+  border-left: 4px solid var(--warning);
+}
+
+.warning-card mat-card-content {
+  align-items: center;
+  color: var(--warning);
+  display: flex;
+  gap: 10px;
+}
+
+.warning-card mat-icon {
+  flex: 0 0 auto;
+}
+
+.diagnostics-hero {
+  min-height: 134px;
+}
+
+.runtime-tile,
+.trace-row {
+  background: var(--surface-strong);
+  border-color: var(--border);
+  border-radius: var(--radius);
+}
+
+.trace-title mat-icon {
+  color: var(--brand);
+}
+
+.support-warning {
+  align-items: flex-start;
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border));
+  border-radius: var(--radius);
+  display: flex;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 12px;
+}
+
+.support-warning mat-icon {
+  color: var(--warning);
+  flex: 0 0 auto;
+}
+
+.support-warning strong,
+.support-warning span {
+  display: block;
+}
+
+.support-warning span,
+.support-status {
+  color: var(--text-soft);
+}
+
+.support-status {
+  font-size: 12px;
+  font-weight: 800;
+}

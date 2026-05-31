@@ -1,0 +1,31 @@
+h2 {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.dialog-icon {
+  align-items: center;
+  background: var(--brand-soft);
+  border-radius: var(--radius);
+  color: var(--brand-strong);
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.warn-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+mat-dialog-content {
+  display: grid;
+  gap: 12px;
+  min-width: min(420px, 72vw);
+}
+
+p {
+  margin: 0;
+}

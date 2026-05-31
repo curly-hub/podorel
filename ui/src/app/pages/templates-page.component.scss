@@ -1,0 +1,31 @@
+p {
+  color: var(--muted-strong);
+  margin: 0 0 14px;
+}
+
+.error-card {
+  border-left: 4px solid var(--danger);
+}
+
+.templates-hero {
+  min-height: 134px;
+}
+
+mat-card-content {
+  display: grid;
+  gap: 14px;
+}
+
+mat-card-content p {
+  margin: 0;
+}
+
+.section-heading {
+  margin: 8px 0 0;
+}
+
+.section-heading h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}

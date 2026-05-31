@@ -1,0 +1,22 @@
+<h2 mat-dialog-title>
+  <span class="dialog-icon" [class.warn-icon]="data.warn"><mat-icon>{{ data.icon }}</mat-icon></span>
+  <span>{{ data.title }}</span>
+</h2>
+
+<mat-dialog-content>
+  <p>{{ data.message }}</p>
+  @if (data.expectedName) {
+    <mat-form-field appearance="outline">
+      <mat-label>Type {{ data.expectedName }}</mat-label>
+      <input matInput [(ngModel)]="typedName" autocomplete="off">
+    </mat-form-field>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">Cancel</button>
+  <button mat-flat-button type="button" [color]="data.warn ? 'warn' : 'primary'" [disabled]="!canConfirm" (click)="confirm()">
+    <mat-icon>{{ data.warn ? 'warning' : 'check' }}</mat-icon>
+    {{ data.confirmLabel }}
+  </button>
+</mat-dialog-actions>

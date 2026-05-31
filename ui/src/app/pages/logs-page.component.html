@@ -1,0 +1,126 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Observe</span>
+      <h1>Logs</h1>
+      <p>Historical log search plus live websocket streaming.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button type="button" (click)="loadHistory()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+      <button mat-stroked-button type="button" (click)="download()">
+        <mat-icon>download</mat-icon>
+        Get Logs
+      </button>
+      <button mat-flat-button color="primary" type="button" (click)="connectLive()" [disabled]="connected()">
+        <mat-icon>online_prediction</mat-icon>
+        {{ connected() ? 'Connected' : 'Connect Live' }}
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card class="warning-card logs-warning-card">
+    <mat-card-content>
+      <mat-icon>warning</mat-icon>
+      <div>
+        <strong>Review logs before sharing</strong>
+        <span>Logs can include hostnames, container names, image names, file paths, and correlation IDs. Click Get Logs to download the current 24-hour selection for support.</span>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <section class="hero-panel logs-hero">
+    <div>
+      <h2>{{ filtered(lines()).length }} historical lines</h2>
+      <p>{{ filtered(liveLines()).length }} live buffered entries. Source filter: {{ source }}.</p>
+    </div>
+    <mat-chip-set class="chip-row">
+      <mat-chip><mat-icon>{{ connected() ? 'wifi' : 'wifi_off' }}</mat-icon>{{ connected() ? 'live connected' : 'live idle' }}</mat-chip>
+      <mat-chip><mat-icon>{{ paused() ? 'pause_circle' : 'play_circle' }}</mat-icon>{{ paused() ? 'paused' : 'flowing' }}</mat-chip>
+    </mat-chip-set>
+  </section>
+
+  <mat-card>
+    <mat-card-content class="filters">
+      <mat-form-field appearance="outline">
+        <mat-label>Search</mat-label>
+        <input matInput [(ngModel)]="search" placeholder="Correlation ID, operation, or text">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Agent</mat-label>
+        <mat-select [(ngModel)]="agentId">
+          <mat-option value="">Current</mat-option>
+          @for (agent of agents(); track agent.id) {
+            <mat-option [value]="agent.id">{{ agent.id }} · {{ agent.status }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Pod ID</mat-label>
+        <input matInput [(ngModel)]="podId">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Container ID</mat-label>
+        <input matInput [(ngModel)]="containerId">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Source</mat-label>
+        <mat-select [(ngModel)]="source">
+          <mat-option value="all">All</mat-option>
+          @for (item of sources(); track item) {
+            <mat-option [value]="item">{{ item }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="limit-field">
+        <mat-label>Lines</mat-label>
+        <input matInput type="number" min="1" max="5000" [(ngModel)]="limit">
+      </mat-form-field>
+      <button mat-icon-button type="button" aria-label="Apply log filters" matTooltip="Apply filters" (click)="loadHistory()">
+        <mat-icon>search</mat-icon>
+      </button>
+      <button mat-icon-button type="button" [attr.aria-label]="paused() ? 'Resume logs' : 'Pause logs'" matTooltip="Pause or resume" (click)="togglePause()">
+        <mat-icon>{{ paused() ? 'play_arrow' : 'pause' }}</mat-icon>
+      </button>
+      <button mat-icon-button type="button" aria-label="Download logs" matTooltip="Download selected range" (click)="download()">
+        <mat-icon>download</mat-icon>
+      </button>
+      <button mat-icon-button type="button" aria-label="Clear live buffer" matTooltip="Clear UI buffer" (click)="clearBuffer()">
+        <mat-icon>backspace</mat-icon>
+      </button>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card>
+    <mat-tab-group>
+      <mat-tab label="Historical 24h">
+        <div class="log-box">
+          @for (line of filtered(lines()); track line.timestamp + line.line) {
+            <code><span>{{ line.timestamp | date: 'mediumTime' }}</span> <strong>{{ line.source }}</strong> {{ line.line }}</code>
+          } @empty {
+            <code>No historical logs match the filter.</code>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Live">
+        <div class="live-toolbar"></div>
+        <div class="log-box">
+          @for (line of filtered(liveLines()); track line.timestamp + line.line) {
+            <code><span>{{ line.timestamp | date: 'mediumTime' }}</span> <strong>{{ line.source }}</strong> {{ line.line }}</code>
+          } @empty {
+            <code>No live log entries in the UI buffer.</code>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
+</section>

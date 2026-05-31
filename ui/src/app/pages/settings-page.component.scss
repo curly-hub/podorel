@@ -1,0 +1,50 @@
+.settings-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+mat-card-title,
+.warning-card mat-card-content {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.toggle-stack,
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.warning-card {
+  border-left: 4px solid var(--warning);
+}
+
+.error-card {
+  border-left: 4px solid var(--danger);
+}
+
+pre {
+  margin: 0;
+  overflow: auto;
+}
+
+.settings-hero {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.settings-hero mat-chip-set {
+  justify-content: flex-end;
+}
+
+@media (max-width: 920px) {
+  .settings-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-hero mat-chip-set {
+    justify-content: flex-start;
+  }
+}

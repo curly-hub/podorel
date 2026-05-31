@@ -1,0 +1,18 @@
+{
+  "Results": [
+    {
+      "Target": "docker.io/library/alpine:3.20",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-0000-0001",
+          "Severity": "HIGH"
+        },
+        {
+          "VulnerabilityID": "CVE-0000-0002",
+          "Severity": "LOW"
+        }
+      ]
+    }
+  ]
+}
+

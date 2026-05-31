@@ -1,0 +1,77 @@
+<section class="auth-page">
+  <div class="auth-copy">
+    <div class="brand-lockup">
+      <div class="brand-mark">
+        <img src="/logo-mark.svg" alt="" aria-hidden="true">
+      </div>
+      <div>
+        <span class="eyebrow">Local Podman Operations</span>
+        <h1>PoDorel</h1>
+      </div>
+    </div>
+    <p>Manage rootless pods, live logs, security scans, agent tokens, and diagnostics from a clean local console.</p>
+    @if (showDevelopmentHint) {
+      <div class="dev-hint">
+        <mat-icon>terminal</mat-icon>
+        <span>Development default: admin / podorel-development-password</span>
+      </div>
+    }
+    <div class="auth-signals">
+      <span><mat-icon>cookie</mat-icon>Session auth</span>
+      <span><mat-icon>verified_user</mat-icon>CSRF protected</span>
+      <span><mat-icon>vpn_key</mat-icon>Scoped agent tokens</span>
+    </div>
+  </div>
+
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title>Sign in</mat-card-title>
+      <mat-card-subtitle>Use the admin password or an agent-scoped token.</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (error) {
+        <div class="error-banner" role="alert">
+          <mat-icon>error</mat-icon>
+          <span>{{ error }}</span>
+        </div>
+      }
+
+      <mat-tab-group>
+        <mat-tab label="Password">
+          <form class="auth-form" (ngSubmit)="login()">
+            <mat-form-field appearance="outline">
+              <mat-label>Username</mat-label>
+              <input matInput name="username" autocomplete="username" [(ngModel)]="username">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Password</mat-label>
+              <input matInput name="password" type="password" autocomplete="current-password" [(ngModel)]="password">
+            </mat-form-field>
+            <button mat-flat-button color="primary" type="submit" [disabled]="busy">
+              <mat-icon>login</mat-icon>
+              Sign In
+            </button>
+          </form>
+        </mat-tab>
+
+        <mat-tab label="Agent Token">
+          <div class="scoped-warning">
+            <mat-icon>info</mat-icon>
+            <span>Agent token sessions are scoped to that agent and Linux user.</span>
+          </div>
+          <form class="auth-form" (ngSubmit)="loginAgent()">
+            <mat-form-field appearance="outline">
+              <mat-label>Agent token</mat-label>
+              <input matInput name="agentToken" type="password" autocomplete="off" [(ngModel)]="agentToken">
+            </mat-form-field>
+            <button mat-flat-button color="primary" type="submit" [disabled]="busy">
+              <mat-icon>vpn_key</mat-icon>
+              Use Token
+            </button>
+          </form>
+        </mat-tab>
+      </mat-tab-group>
+    </mat-card-content>
+  </mat-card>
+</section>

@@ -1,0 +1,73 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Audit</span>
+      <h1>Audit Log</h1>
+      <p>Externally visible actions with result and correlation IDs.</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="refresh()">
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  <section class="hero-panel audit-hero">
+    <div>
+      <h2>{{ filtered().length }} visible events</h2>
+      <p>Search actions, targets, details, and correlation IDs from the current audit window.</p>
+    </div>
+  </section>
+
+  <mat-card>
+    <mat-card-content class="filters">
+      <mat-form-field appearance="outline">
+        <mat-label>Search</mat-label>
+        <input matInput [(ngModel)]="search">
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="limit-field">
+        <mat-label>Limit</mat-label>
+        <input matInput type="number" min="1" [(ngModel)]="limit">
+      </mat-form-field>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card>
+    <div class="table-wrap">
+      <table mat-table [dataSource]="filtered()">
+      <ng-container matColumnDef="created_at">
+        <th mat-header-cell *matHeaderCellDef>Created</th>
+        <td mat-cell *matCellDef="let event">{{ event.created_at | date: 'short' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="action">
+        <th mat-header-cell *matHeaderCellDef>Action</th>
+        <td mat-cell *matCellDef="let event">{{ event.action }}</td>
+      </ng-container>
+      <ng-container matColumnDef="target">
+        <th mat-header-cell *matHeaderCellDef>Target</th>
+        <td mat-cell *matCellDef="let event">{{ event.target_type }} · {{ event.target_id }}</td>
+      </ng-container>
+      <ng-container matColumnDef="result">
+        <th mat-header-cell *matHeaderCellDef>Result</th>
+        <td mat-cell *matCellDef="let event">{{ event.result }}</td>
+      </ng-container>
+      <ng-container matColumnDef="correlation_id">
+        <th mat-header-cell *matHeaderCellDef>Correlation</th>
+        <td mat-cell *matCellDef="let event">{{ event.correlation_id }}</td>
+      </ng-container>
+      <ng-container matColumnDef="details">
+        <th mat-header-cell *matHeaderCellDef>Details</th>
+        <td mat-cell *matCellDef="let event"><code>{{ event.details | json }}</code></td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+      </table>
+    </div>
+  </mat-card>
+</section>

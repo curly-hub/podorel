@@ -1,0 +1,17 @@
+[
+  {
+    "id": "podorel-test-container-1",
+    "pod": "podorel-test-pod",
+    "name": "podorel-test-one",
+    "cpu_percent": "100.00%",
+    "mem_usage": "1MiB / 1GiB"
+  },
+  {
+    "id": "podorel-test-container-2",
+    "pod": "podorel-test-pod",
+    "name": "podorel-test-two",
+    "cpu_percent": "50.00%",
+    "mem_usage": "2MiB / 1GiB"
+  }
+]
+

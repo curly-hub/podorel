@@ -1,0 +1,55 @@
+.logs-hero {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.logs-hero mat-chip-set {
+  justify-content: flex-end;
+}
+
+.filters {
+  align-items: end;
+}
+
+.filters mat-form-field {
+  min-width: min(280px, 100%);
+}
+
+.limit-field {
+  max-width: 128px;
+}
+
+@media (max-width: 820px) {
+  .logs-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .logs-hero mat-chip-set {
+    justify-content: flex-start;
+  }
+}
+
+.warning-card {
+  border-left: 4px solid var(--warning);
+}
+
+.warning-card mat-card-content {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+}
+
+.warning-card mat-icon {
+  color: var(--warning);
+  flex: 0 0 auto;
+}
+
+.warning-card strong,
+.warning-card span {
+  display: block;
+}
+
+.warning-card span {
+  color: var(--text-soft);
+  margin-top: 2px;
+}

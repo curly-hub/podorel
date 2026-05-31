@@ -1,0 +1,14 @@
+[Unit]
+Description=PoDorel rootless Podman agent
+After=network.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+ExecStart=%h/.local/bin/podorel-agent --production
+Restart=always
+RestartSec=2s
+WatchdogSec=30s
+
+[Install]
+WantedBy=default.target

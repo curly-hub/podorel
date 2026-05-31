@@ -1,0 +1,7 @@
+services:
+  web:
+    image: docker.io/library/nginx:1.27-alpine
+    container_name: podorel-hello-web
+    restart: unless-stopped
+    ports:
+      - "${HELLO_WEB_PORT:-8088}:80"

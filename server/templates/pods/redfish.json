@@ -1,0 +1,28 @@
+{
+  "id": "redfish",
+  "version": "1.0.0",
+  "name": "Redfish Mock Service",
+  "description": "Redfish-compatible mock service pod for firmware and hardware workflow testing.",
+  "image": "quay.io/cloud-bulldozer/redfish-mockup-server:latest",
+  "ports": [
+    {
+      "host": 8000,
+      "container": 8000,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [],
+  "environment": {},
+  "secrets": [],
+  "health_command": ["sh", "-c", "test -d /mockups || true"],
+  "resource_limits": {
+    "cpu": "1",
+    "memory": "256MiB"
+  },
+  "restart_policy": "on-failure",
+  "labels": {
+    "io.podorel.template": "redfish"
+  },
+  "ui_notes": ["Useful for validating Redfish-adjacent management flows without a physical device."]
+}
+

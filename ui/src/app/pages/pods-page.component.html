@@ -1,0 +1,167 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Operate</span>
+      <h1>Pods <app-help-tooltip [text]="helpTopics.page" label="Pods help"></app-help-tooltip></h1>
+      <p>Scan, filter, and control local rootless Podman pods.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+      <button mat-flat-button color="primary" routerLink="/create-pod">
+        <mat-icon>add</mat-icon>
+        Create
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  @if (agentWarning()) {
+    <mat-card class="warning-card">
+      <mat-card-content>
+        <mat-icon>info</mat-icon>
+        <span>{{ agentWarning() }}</span>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <section class="hero-panel pods-hero">
+    <div>
+      <h2>{{ pods().length }} pods tracked</h2>
+      <p>{{ stateCount('running') }} running, {{ stateCount('degraded') }} degraded, {{ stateCount('stopped') }} stopped.</p>
+    </div>
+    <mat-chip-set class="chip-row">
+      @for (filter of stateFilters; track filter) {
+        <mat-chip [class]="'state-' + filter">{{ filter }} · {{ stateCount(filter) }}</mat-chip>
+      }
+    </mat-chip-set>
+  </section>
+
+  <mat-card class="filters-card">
+    <mat-card-content class="filters">
+      <mat-form-field appearance="outline">
+        <mat-label>Search pods</mat-label>
+        <input matInput [(ngModel)]="search" placeholder="Name, ID, agent, state">
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>State</mat-label>
+        <mat-select [(ngModel)]="stateFilter">
+          @for (filter of stateFilters; track filter) {
+            <mat-option [value]="filter">{{ filter }} ({{ stateCount(filter) }})</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="pod-grid">
+    @for (pod of filteredPods(); track pod.id) {
+      <mat-card [class]="podCardClass(pod)">
+        <mat-card-header>
+          <span mat-card-avatar class="pod-avatar"><mat-icon>apps</mat-icon></span>
+          <mat-card-title>
+            <a [routerLink]="['/pods', pod.id]">{{ pod.name }}</a>
+          </mat-card-title>
+          <mat-card-subtitle>{{ shortId(pod.id) }} · {{ pod.agent_id }}</mat-card-subtitle>
+        </mat-card-header>
+
+        <mat-card-content>
+          <mat-chip-set class="chip-row">
+            <mat-chip [class]="stateClass(pod)" [matTooltip]="helpTopics.state"><mat-icon>radio_button_checked</mat-icon>{{ pod.state }}</mat-chip>
+            <mat-chip [matTooltip]="helpTopics.health"><mat-icon>health_and_safety</mat-icon>{{ pod.health || 'unknown' }}</mat-chip>
+            <mat-chip [matTooltip]="helpTopics.scan"><mat-icon>security_update_warning</mat-icon>not scanned</mat-chip>
+            <mat-chip [matTooltip]="helpTopics.source"><mat-icon>sync_alt</mat-icon>{{ pod.snapshot_source || 'live' }}</mat-chip>
+            @if (!agentOnline(pod)) {
+              <mat-chip [matTooltip]="helpTopics.agentOffline"><mat-icon>cloud_off</mat-icon>agent offline</mat-chip>
+            }
+            @if (pod.self_management) {
+              <mat-chip><mat-icon>verified_user</mat-icon>PoDorel self</mat-chip>
+            }
+          </mat-chip-set>
+
+          <div class="metric-stack">
+            <div class="metric-row">
+              <div>
+                <span class="term-with-help">CPU <app-help-tooltip [text]="helpTopics.cpu" label="CPU help"></app-help-tooltip></span>
+                <strong>{{ metricLabel(pod, 'cpu') }}</strong>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="statsAvailable(pod) ? cpuValue(pod) : 0"></mat-progress-bar>
+            </div>
+            <div class="metric-row">
+              <div>
+                <span class="term-with-help">Memory <app-help-tooltip [text]="helpTopics.memory" label="Memory help"></app-help-tooltip></span>
+                <strong>{{ metricLabel(pod, 'memory') }}</strong>
+              </div>
+              <mat-progress-bar mode="determinate" [value]="statsAvailable(pod) ? memoryValue(pod) : 0"></mat-progress-bar>
+            </div>
+            <div class="metric-source" [class.muted]="!statsAvailable(pod)">
+              <mat-icon>query_stats</mat-icon>
+              <span>{{ statsSourceLabel(pod) }}</span><app-help-tooltip [text]="helpTopics.statsSource" label="Stats source help"></app-help-tooltip>
+            </div>
+          </div>
+
+          <dl>
+            <div>
+              <dt>Containers <app-help-tooltip [text]="helpTopics.containers" label="Containers help"></app-help-tooltip></dt>
+              <dd>{{ pod.containers.length }} · {{ containerStateSummary(pod) }}</dd>
+            </div>
+            <div>
+              <dt>Uptime <app-help-tooltip [text]="helpTopics.uptime" label="Uptime help"></app-help-tooltip></dt>
+              <dd>{{ uptime(pod) }}</dd>
+            </div>
+          </dl>
+
+          @if (podIssue(pod)) {
+            <div class="pod-issue">
+              <mat-icon>info</mat-icon>
+              <span>{{ podIssue(pod) }}</span>
+            </div>
+          }
+        </mat-card-content>
+
+        <mat-card-actions>
+          @if (shellContainerId(pod); as shellId) {
+            <button mat-stroked-button class="shell-action" aria-label="Open shell" matTooltip="Open container shell" [routerLink]="['/containers', shellId]" [queryParams]="{ tab: 'shell' }">
+              <mat-icon>terminal</mat-icon>
+              Shell
+            </button>
+          } @else {
+            <button mat-stroked-button class="shell-action" aria-label="Shell unavailable" matTooltip="No running container available for shell" disabled>
+              <mat-icon>terminal</mat-icon>
+              Shell
+            </button>
+          }
+          <button mat-icon-button aria-label="Start pod" matTooltip="Start" [disabled]="!canStart(pod)" (click)="action(pod, 'start')">
+            <mat-icon>play_arrow</mat-icon>
+          </button>
+          <button mat-icon-button aria-label="Stop pod" matTooltip="Stop" [disabled]="!canStop(pod)" (click)="action(pod, 'stop')">
+            <mat-icon>stop</mat-icon>
+          </button>
+          <button mat-icon-button aria-label="Restart pod" matTooltip="Restart" [disabled]="!canRestart(pod)" (click)="action(pod, 'restart')">
+            <mat-icon>restart_alt</mat-icon>
+          </button>
+          <button mat-icon-button color="warn" aria-label="Kill pod" matTooltip="Kill" [disabled]="!canKill(pod)" (click)="action(pod, 'kill')">
+            <mat-icon>dangerous</mat-icon>
+          </button>
+          <button mat-icon-button color="warn" aria-label="Delete pod" matTooltip="Delete" [disabled]="!canDelete(pod)" (click)="action(pod, 'delete')">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    } @empty {
+      <mat-card>
+        <mat-card-content class="empty-state">
+          <mat-icon>apps</mat-icon>
+          <span>No pods are visible yet. Check agent registration if PoDorel itself is missing.</span>
+        </mat-card-content>
+      </mat-card>
+    }
+  </div>
+</section>

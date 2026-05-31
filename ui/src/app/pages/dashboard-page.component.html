@@ -1,0 +1,142 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Overview</span>
+      <h1>Dashboard <app-help-tooltip [text]="helpTopics.page" label="Dashboard help"></app-help-tooltip></h1>
+      <p>Live operational state for pods, agents, security posture, and recent actions.</p>
+    </div>
+    <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()">
+      <mat-icon>refresh</mat-icon>
+      Refresh
+    </button>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  @if (devSupervisorWarning()) {
+    <mat-card class="warning-card supervisor-warning-card">
+      <mat-card-content>
+        <mat-icon>warning</mat-icon>
+        <div>
+          <strong>Development supervisor warning <app-help-tooltip [text]="helpTopics.supervisor" label="Supervisor help"></app-help-tooltip></strong>
+          <span>{{ devSupervisorWarning() }}</span>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <section class="hero-panel">
+    <div class="identity-row">
+      <div class="identity">
+        <span class="pod-avatar"><mat-icon>apps</mat-icon></span>
+        <div>
+          <h2>{{ selfStatusLabel() }}</h2>
+          <p>{{ pods().length }} pods observed across {{ agents().length }} registered agents.</p>
+        </div>
+      </div>
+      <mat-chip-set class="chip-row">
+        <mat-chip><mat-icon>health_and_safety</mat-icon>{{ unhealthyPods() }} unhealthy</mat-chip>
+        <mat-chip><mat-icon>folder_managed</mat-icon>{{ logLimitLabel() }}</mat-chip>
+      </mat-chip-set>
+    </div>
+  </section>
+
+  <div class="metric-grid">
+    <article class="metric-card">
+      <header><span><mat-icon>apps</mat-icon>Pods <app-help-tooltip [text]="helpTopics.pods" label="Pods help"></app-help-tooltip></span></header>
+      <strong class="metric-value">{{ pods().length }}</strong>
+      <span class="metric-subtitle">{{ podCountByState('running') }} running / {{ podCountByState('stopped') }} stopped</span>
+    </article>
+    <article class="metric-card">
+      <header><span><mat-icon>speed</mat-icon>CPU <app-help-tooltip [text]="helpTopics.cpu" label="CPU help"></app-help-tooltip></span></header>
+      <strong class="metric-value">{{ totalCpuLabel() }}</strong>
+      <span class="metric-subtitle">Host-total Podman stats</span>
+    </article>
+    <article class="metric-card">
+      <header><span><mat-icon>memory</mat-icon>Memory <app-help-tooltip [text]="helpTopics.memory" label="Memory help"></app-help-tooltip></span></header>
+      <strong class="metric-value">{{ formatMemory(totalMemoryBytes()) }}</strong>
+      <span class="metric-subtitle">Current Podman memory usage</span>
+    </article>
+    <article class="metric-card">
+      <header><span><mat-icon>security</mat-icon>Security <app-help-tooltip [text]="helpTopics.security" label="Security help"></app-help-tooltip></span></header>
+      <strong class="metric-value">{{ security()?.status ?? 'unknown' }}</strong>
+      <span class="metric-subtitle">{{ security()?.scanner ?? 'scanner unknown' }}</span>
+    </article>
+  </div>
+
+  <div class="dashboard-grid">
+    <section class="panel">
+      <header class="panel-heading"><span><mat-icon>hub</mat-icon>Agents <app-help-tooltip [text]="helpTopics.agents" label="Agents help"></app-help-tooltip></span></header>
+      <div class="list-stack">
+        @for (agent of agents(); track agent.id) {
+          <article class="list-row">
+            <div class="row-main">
+              <span class="avatar"><mat-icon>dns</mat-icon></span>
+              <div>
+                <strong>{{ agent.id }}</strong>
+                <small>{{ agent.linux_username }} · UID {{ agent.linux_uid }}</small>
+              </div>
+            </div>
+            <mat-chip [class]="'state-' + agent.status">{{ agent.status }}</mat-chip>
+          </article>
+        } @empty {
+          <div class="empty-panel">No agents registered.</div>
+        }
+      </div>
+    </section>
+
+    <section class="panel">
+      <header class="panel-heading"><span><mat-icon>fact_check</mat-icon>Recent Actions <app-help-tooltip [text]="helpTopics.recentActions" label="Recent actions help"></app-help-tooltip></span></header>
+      <div class="list-stack">
+        @for (event of audit(); track event.id) {
+          <article class="list-row">
+            <div class="row-main">
+              <span class="avatar" [class.accent]="event.result !== 'success'">
+                <mat-icon>{{ event.result === 'success' ? 'check_circle' : 'error' }}</mat-icon>
+              </span>
+              <div>
+                <strong>{{ event.action }} · {{ event.result }}</strong>
+                <small>{{ event.created_at | date: 'short' }} · {{ event.correlation_id }}</small>
+              </div>
+            </div>
+          </article>
+        } @empty {
+          <div class="empty-panel">No recent actions.</div>
+        }
+      </div>
+    </section>
+
+    <section class="panel">
+      <header class="panel-heading"><span><mat-icon>report</mat-icon>Recent Errors</span></header>
+      <div class="list-stack">
+        @for (event of recentErrors(); track event.id) {
+          <article class="list-row">
+            <div class="row-main">
+              <span class="avatar accent"><mat-icon>error</mat-icon></span>
+              <div>
+                <strong>{{ event.action }}</strong>
+                <small>{{ event.correlation_id }}</small>
+              </div>
+            </div>
+          </article>
+        } @empty {
+          <div class="empty-panel">No recent errors.</div>
+        }
+      </div>
+    </section>
+
+    <section class="panel">
+      <header class="panel-heading"><span><mat-icon>monitor_heart</mat-icon>Runtime Profile <app-help-tooltip [text]="helpTopics.runtime" label="Runtime profile help"></app-help-tooltip></span></header>
+      <dl class="metadata">
+        <div><dt>Mode</dt><dd>{{ settings()?.mode ?? 'unknown' }}</dd></div>
+        <div><dt>Logs</dt><dd>{{ logLimitLabel() }}</dd></div>
+        <div><dt>Self status</dt><dd>{{ selfStatusLabel() }}</dd></div>
+        <div><dt>Supervisor</dt><dd>{{ devSupervisorMode() }} · {{ devSupervisorStatus() }}</dd></div>
+      </dl>
+    </section>
+  </div>
+</section>

@@ -1,0 +1,30 @@
+{
+  "id": "alpine-go",
+  "version": "1.0.0",
+  "name": "Alpine Go",
+  "description": "Go runtime pod based on Alpine for compiled services.",
+  "image": "docker.io/library/alpine:3.20",
+  "command": ["sh", "-c", "while true; do sleep 3600; done"],
+  "ports": [
+    {
+      "host": 8081,
+      "container": 8080,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [],
+  "environment": {
+    "GODEBUG": "madvdontneed=1"
+  },
+  "secrets": [],
+  "health_command": ["sh", "-c", "test -x /app/server"],
+  "resource_limits": {
+    "cpu": "1",
+    "memory": "128MiB"
+  },
+  "restart_policy": "on-failure",
+  "labels": {
+    "io.podorel.template": "alpine-go"
+  },
+  "ui_notes": ["Mount or build a static Go binary at /app/server."]
+}

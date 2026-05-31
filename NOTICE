@@ -1,0 +1,22 @@
+PoDorel Licensing Notice
+=========================
+
+Copyright (c) 2026 Curly Hub.
+
+PoDorel is dual-licensed:
+
+1. Open-source license: GNU Affero General Public License v3.0 or later
+   (AGPL-3.0-or-later), as provided in LICENSE.
+
+2. Commercial license: available from Curly Hub for proprietary,
+   closed-source, or otherwise non-AGPL use.
+
+Under the AGPL license, you may use, copy, modify, distribute, and run modified
+versions of PoDorel, including over a network, if you comply with the AGPL.
+Works that incorporate PoDorel and are distributed or made available as a
+network service must provide corresponding source code under AGPL-compatible
+terms.
+
+A paid commercial license is required if you want to use PoDorel in a
+proprietary product, keep modifications or combined works closed source, or use
+PoDorel outside the AGPL terms.

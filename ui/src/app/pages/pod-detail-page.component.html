@@ -1,0 +1,200 @@
+<section class="page">
+  <header class="page-header">
+    <div class="page-title">
+      <span class="eyebrow">Pod Detail</span>
+      <h1>{{ pod()?.name ?? 'Pod Detail' }}</h1>
+      <p>{{ pod()?.id ?? 'Loading pod metadata' }}</p>
+    </div>
+    <div class="header-actions">
+      @if (primaryShellContainerId(); as shellId) {
+        <button mat-flat-button color="primary" type="button" [routerLink]="['/containers', shellId]" [queryParams]="{ tab: 'shell' }">
+          <mat-icon>terminal</mat-icon>
+          Shell
+        </button>
+      }
+      <button mat-stroked-button type="button" (click)="refresh()" [disabled]="loading()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <mat-card class="error-card">
+      <mat-card-content>{{ error() }}</mat-card-content>
+    </mat-card>
+  }
+
+  @if (pod(); as currentPod) {
+    <section class="hero-panel detail-hero">
+        <div class="identity-row">
+          <div class="identity">
+            <span class="pod-avatar"><mat-icon>apps</mat-icon></span>
+            <div>
+              <h2>{{ currentPod.name }}</h2>
+              <p>{{ shortId(currentPod.id) }} · {{ currentPod.agent_id }}</p>
+            </div>
+          </div>
+          <mat-chip-set>
+            <mat-chip [class]="stateClass(currentPod.state)"><mat-icon>radio_button_checked</mat-icon>{{ currentPod.state }}</mat-chip>
+            <mat-chip><mat-icon>health_and_safety</mat-icon>{{ currentPod.health || 'unknown' }}</mat-chip>
+            <mat-chip><mat-icon>security</mat-icon>{{ security()?.status ?? 'unknown' }}</mat-chip>
+          </mat-chip-set>
+        </div>
+
+        <div class="summary-grid">
+          <section class="summary-tile">
+            <span>CPU</span>
+            <strong>{{ totalCpuLabel() }}</strong>
+            <mat-progress-bar mode="determinate" [value]="totalCpuProgress()"></mat-progress-bar>
+          </section>
+          <section class="summary-tile">
+            <span>Memory</span>
+            <strong>{{ totalMemoryLabel() }}</strong>
+            <mat-progress-bar mode="determinate" [value]="totalMemoryProgress()"></mat-progress-bar>
+          </section>
+          <section class="summary-tile">
+            <span>Containers</span>
+            <strong>{{ containers().length }}</strong>
+            <small>{{ containerStateSummary() }}</small>
+          </section>
+          <section class="summary-tile">
+            <span>Observed</span>
+            <strong>{{ currentPod.observed_at | date: 'shortTime' }}</strong>
+            <small>{{ currentPod.observed_at | date: 'mediumDate' }}</small>
+          </section>
+        </div>
+
+        @if (podIssue()) {
+          <div class="pod-issue">
+            <mat-icon>info</mat-icon>
+            <span>{{ podIssue() }}</span>
+          </div>
+        }
+    </section>
+
+    <mat-card class="detail-tabs">
+      <mat-tab-group>
+        <mat-tab label="Overview">
+          <div class="tab-panel overview-grid">
+            <section class="metadata-panel">
+              <h3>Metadata</h3>
+              <dl class="metadata">
+                <div><dt>Agent</dt><dd>{{ currentPod.agent_id }}</dd></div>
+                <div><dt>Podman ID</dt><dd>{{ currentPod.podman_pod_id }}</dd></div>
+                <div><dt>Created</dt><dd>{{ currentPod.created_at | date: 'medium' }}</dd></div>
+                <div><dt>Observed</dt><dd>{{ currentPod.observed_at | date: 'medium' }}</dd></div>
+              </dl>
+            </section>
+
+            <section class="containers-panel">
+              <h3>Containers</h3>
+              <div class="container-list">
+                @for (container of containers(); track container.id) {
+                  <article class="container-row">
+                    <div class="container-main">
+                      <mat-icon>inventory_2</mat-icon>
+                      <div>
+                        <a [routerLink]="['/containers', container.id]">{{ container.name }}</a>
+                        <span>{{ container.image }}</span>
+                      </div>
+                    </div>
+                    <mat-chip-set>
+                      <mat-chip [class]="stateClass(container.state)">{{ container.state }}</mat-chip>
+                      <mat-chip><mat-icon>health_and_safety</mat-icon>{{ container.health || 'unknown' }}</mat-chip>
+                      <mat-chip><mat-icon>speed</mat-icon>{{ containerCpuLabel(container) }}</mat-chip>
+                      <mat-chip><mat-icon>memory</mat-icon>{{ containerMemoryLabel(container) }}</mat-chip>
+                    </mat-chip-set>
+                    <div class="container-actions">
+                      <button mat-icon-button matTooltip="Shell" [routerLink]="['/containers', container.id]" [queryParams]="{ tab: 'shell' }" [disabled]="!canOpenShell(container)"><mat-icon>terminal</mat-icon></button>
+                      <button mat-icon-button matTooltip="Start" [disabled]="!canContainerAction(container, 'start')" (click)="containerAction(container, 'start')"><mat-icon>play_arrow</mat-icon></button>
+                      <button mat-icon-button matTooltip="Stop" [disabled]="!canContainerAction(container, 'stop')" (click)="containerAction(container, 'stop')"><mat-icon>stop</mat-icon></button>
+                      <button mat-icon-button matTooltip="Restart" [disabled]="!canContainerAction(container, 'restart')" (click)="containerAction(container, 'restart')"><mat-icon>restart_alt</mat-icon></button>
+                      <button mat-icon-button color="warn" matTooltip="Kill" [disabled]="!canContainerAction(container, 'kill')" (click)="containerAction(container, 'kill')"><mat-icon>dangerous</mat-icon></button>
+                      <button mat-icon-button color="warn" matTooltip="Delete" [disabled]="!canContainerAction(container, 'delete')" (click)="containerAction(container, 'delete')"><mat-icon>delete</mat-icon></button>
+                    </div>
+                  </article>
+                } @empty {
+                  <div class="empty-panel">No containers are attached to this pod snapshot.</div>
+                }
+              </div>
+            </section>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Stats">
+          <div class="tab-panel stats-grid">
+            @for (sample of stats(); track sample.id) {
+              <article class="stat-panel">
+                <header>
+                  <strong>{{ shortId(sample.container_id) }}</strong>
+                  <small>{{ sample.sampled_at | date: 'medium' }}</small>
+                </header>
+                <div class="metric-row">
+                  <div><span>CPU</span><strong>{{ formatCpu(sample.cpu_percent_host_total) }}</strong></div>
+                  <mat-progress-bar mode="determinate" [value]="sampleCpuProgress(sample)"></mat-progress-bar>
+                </div>
+                <div class="metric-row">
+                  <div><span>Memory</span><strong>{{ sample.memory_podman_raw || formatMemory(sample.memory_bytes) }}</strong></div>
+                  <mat-progress-bar mode="determinate" [value]="sampleMemoryProgress(sample)"></mat-progress-bar>
+                </div>
+              </article>
+            } @empty {
+              <div class="empty-panel">Stats unavailable.</div>
+            }
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Logs">
+          <div class="tab-panel log-box">
+            @for (line of logs(); track line.timestamp + line.line) {
+              <code><span>{{ line.timestamp | date: 'mediumTime' }}</span> <strong>{{ line.source }}</strong> {{ line.line }}</code>
+            } @empty {
+              <code>No logs matched this pod.</code>
+            }
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Security">
+          <div class="tab-panel">
+            <pre>{{ security() | json }}</pre>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Actions">
+          <div class="tab-panel action-grid">
+            <button mat-flat-button color="primary" [disabled]="!canPodAction('start')" (click)="podAction('start')"><mat-icon>play_arrow</mat-icon>Start</button>
+            <button mat-stroked-button [disabled]="!canPodAction('stop')" (click)="podAction('stop')"><mat-icon>stop</mat-icon>Stop</button>
+            <button mat-stroked-button [disabled]="!canPodAction('restart')" (click)="podAction('restart')"><mat-icon>restart_alt</mat-icon>Restart</button>
+            <button mat-flat-button color="warn" [disabled]="!canPodAction('kill')" (click)="podAction('kill')"><mat-icon>dangerous</mat-icon>Kill</button>
+            <button mat-flat-button color="warn" [disabled]="!canPodAction('delete')" (click)="podAction('delete')"><mat-icon>delete</mat-icon>Delete</button>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Rules">
+          <div class="tab-panel">
+            <mat-chip-set>
+              <mat-chip><mat-icon>rule</mat-icon>Automation rules evaluate snapshots.</mat-chip>
+            </mat-chip-set>
+          </div>
+        </mat-tab>
+
+        <mat-tab label="Audit">
+          <div class="tab-panel">
+            <mat-list>
+              @for (event of audit(); track event.id) {
+                <mat-list-item>
+                  <mat-icon matListItemIcon>{{ event.result === 'success' ? 'check_circle' : 'error' }}</mat-icon>
+                  <span matListItemTitle>{{ event.action }} · {{ event.result }}</span>
+                  <span matListItemLine>{{ event.created_at | date: 'short' }} · {{ event.correlation_id }}</span>
+                </mat-list-item>
+              } @empty {
+                <mat-list-item>No audit events for this pod.</mat-list-item>
+              }
+            </mat-list>
+          </div>
+        </mat-tab>
+      </mat-tab-group>
+    </mat-card>
+  }
+</section>

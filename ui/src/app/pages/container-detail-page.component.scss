@@ -1,0 +1,216 @@
+.tab-panel {
+  padding: 18px 0 4px;
+}
+
+dl {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: 0;
+}
+
+dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+dd {
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+.log-box {
+  background: var(--code-bg);
+  border-radius: 8px;
+  color: var(--code-text);
+  display: grid;
+  gap: 4px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.action-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.error-card {
+  border-left: 4px solid var(--danger);
+}
+
+.identity-row {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.identity h2,
+.identity p {
+  margin: 0;
+}
+
+.identity p {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.metadata {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+@media (max-width: 820px) {
+  .identity-row {
+    align-items: stretch;
+    display: grid;
+  }
+}
+
+.shell-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.shell-warning {
+  align-items: flex-start;
+  background: var(--warning-soft);
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border));
+  border-radius: var(--radius);
+  color: var(--text);
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+}
+
+.shell-warning mat-icon {
+  color: var(--warning);
+  flex: 0 0 auto;
+}
+
+.shell-warning div {
+  display: grid;
+  gap: 4px;
+}
+
+.shell-warning span,
+.shell-hint {
+  color: var(--muted-strong);
+}
+
+.shell-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.shell-toolbar mat-form-field {
+  width: 140px;
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.shell-error {
+  align-items: center;
+  color: var(--danger);
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.terminal-output {
+  background: #050807;
+  border: 1px solid color-mix(in srgb, var(--brand) 24%, #111);
+  border-radius: 8px;
+  color: #dff8ef;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+  max-height: 520px;
+  min-height: 320px;
+  overflow: auto;
+  padding: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.shell-input {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.shell-input mat-form-field {
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .shell-input {
+    grid-template-columns: 1fr;
+  }
+
+  .shell-toolbar mat-form-field,
+  .shell-toolbar button {
+    width: 100%;
+  }
+}
+
+.terminal-output.connected {
+  cursor: text;
+}
+
+.terminal-output:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(var(--brand-rgb), .22);
+  outline: none;
+}
+
+.terminal-caret {
+  background: #dff8ef;
+  display: inline-block;
+  height: 1.1em;
+  margin-left: 1px;
+  transform: translateY(2px);
+  width: 7px;
+}
+
+.terminal-caret.active {
+  animation: terminal-caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes terminal-caret-blink {
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0; }
+}
+
+.terminal-output {
+  height: min(64vh, 620px);
+  min-height: 380px;
+  padding: 0;
+  position: relative;
+}
+
+.terminal-host {
+  height: 100%;
+  width: 100%;
+}
+
+:host ::ng-deep .terminal-output .xterm {
+  height: 100%;
+  padding: 12px;
+}
+
+:host ::ng-deep .terminal-output .xterm-viewport,
+:host ::ng-deep .terminal-output .xterm-screen {
+  background: transparent !important;
+}
+
+:host ::ng-deep .terminal-output .xterm-helper-textarea {
+  opacity: 0;
+}

@@ -1,0 +1,30 @@
+{
+  "id": "alpine-nodejs",
+  "version": "1.0.0",
+  "name": "Alpine Node.js",
+  "description": "Small Node.js pod based on Alpine for lightweight services.",
+  "image": "docker.io/library/node:22-alpine",
+  "command": ["node", "-e", "setInterval(() => {}, 2147483647)"],
+  "ports": [
+    {
+      "host": 3000,
+      "container": 3000,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [],
+  "environment": {
+    "NODE_ENV": "production"
+  },
+  "secrets": [],
+  "health_command": ["node", "--version"],
+  "resource_limits": {
+    "cpu": "1",
+    "memory": "256MiB"
+  },
+  "restart_policy": "on-failure",
+  "labels": {
+    "io.podorel.template": "alpine-nodejs"
+  },
+  "ui_notes": ["Use for compact Node.js services and test workloads."]
+}

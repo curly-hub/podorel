@@ -1,0 +1,72 @@
+<mat-sidenav-container class="shell" [class.auth-shell]="!currentUser()">
+  @if (currentUser()) {
+  <mat-sidenav class="nav" mode="side" [opened]="navOpened()">
+    <div class="brand-block">
+      <span class="brand-mark"><img src="/logo-mark.svg" alt="" aria-hidden="true"></span>
+      <div>
+        <strong>PoDorel</strong>
+        <span>Podman control plane</span>
+      </div>
+    </div>
+
+    <mat-nav-list class="nav-groups">
+      @for (section of navSections; track section.label) {
+        <section class="nav-section">
+          <h2>{{ section.label }}</h2>
+          @for (item of section.items; track item.path) {
+            <a mat-list-item [routerLink]="item.path" routerLinkActive="active-link">
+              <mat-icon>{{ item.icon }}</mat-icon>
+              <span>{{ item.label }}</span>
+            </a>
+          }
+        </section>
+      }
+    </mat-nav-list>
+
+    @if (currentUser(); as user) {
+      <div class="nav-footer">
+        <span class="avatar"><mat-icon>person</mat-icon></span>
+        <div>
+          <strong>{{ user.username || user.session_type }}</strong>
+          <span>{{ user.session_type }}</span>
+        </div>
+      </div>
+    }
+  </mat-sidenav>
+  }
+
+  <mat-sidenav-content class="main-surface">
+    @if (currentUser()) {
+      <mat-toolbar class="topbar">
+        <button mat-icon-button type="button" aria-label="Toggle navigation" matTooltip="Toggle navigation" (click)="toggleNav()">
+          <mat-icon>menu</mat-icon>
+        </button>
+        <div class="topbar-copy">
+          <span class="topbar-title">Local Podman</span>
+          <small>Rootless pods, logs, agents, and security in one place</small>
+        </div>
+        <span class="toolbar-spacer"></span>
+        @if (currentUser(); as user) {
+          <button mat-icon-button type="button" [attr.aria-label]="themeTooltip()" [matTooltip]="themeTooltip()" (click)="toggleTheme()">
+            <mat-icon>{{ themeIcon() }}</mat-icon>
+          </button>
+          <button mat-icon-button routerLink="/diagnostics" aria-label="Diagnostics" matTooltip="Diagnostics">
+            <mat-icon>monitor_heart</mat-icon>
+          </button>
+        <button mat-icon-button routerLink="/settings" aria-label="Settings" matTooltip="Settings">
+          <mat-icon>settings</mat-icon>
+        </button>
+        <span class="user-label">{{ user.username || user.session_type }}</span>
+        <button mat-stroked-button type="button" class="auth-button" (click)="logout()">
+          <mat-icon>logout</mat-icon>
+          Sign out
+        </button>
+        }
+      </mat-toolbar>
+    }
+
+    <main class="content" [class.auth-content]="!currentUser()">
+      <router-outlet></router-outlet>
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>
