@@ -61,13 +61,32 @@ if [ "$TARGET_HOME" = "" ]; then
   echo "Could not determine home directory for ${TARGET_USER}" >&2
   exit 1
 fi
+TARGET_UID="$(id -u "$TARGET_USER")"
+TARGET_GROUP="$(id -gn "$TARGET_USER")"
+TARGET_RUNTIME_DIR="/run/user/${TARGET_UID}"
+if [ "$TARGET_UID" = "0" ]; then
+  echo "Production deployment target must be a non-root user. Re-run as the target user with sudo available, or pass --target-user USER." >&2
+  exit 1
+fi
+
+run_as_target_user() {
+  sudo -H -u "$TARGET_USER" env \
+    HOME="$TARGET_HOME" \
+    USER="$TARGET_USER" \
+    LOGNAME="$TARGET_USER" \
+    XDG_RUNTIME_DIR="$TARGET_RUNTIME_DIR" \
+    "$@"
+}
 
 if [ "$DRY_RUN" = "1" ]; then
   podorel_step "Checking production commands for dry run"
   podorel_require_command podman
   podorel_require_command go
+  podorel_require_go_version_for_module go.mod
   podorel_require_command install
   echo "Target user: ${TARGET_USER}"
+  echo "Target home: ${TARGET_HOME}"
+  echo "Target runtime: ${TARGET_RUNTIME_DIR}"
   podorel_step "Dry run complete"
   exit 0
 fi
@@ -97,6 +116,7 @@ esac
 podorel_step "Checking required production tools"
 podorel_require_command podman
 podorel_require_command go
+podorel_require_go_version_for_module go.mod
 podorel_require_command install
 podorel_require_command loginctl
 
@@ -104,18 +124,21 @@ podorel_step "Building binaries"
 go build -o ./bin/podorel ./cmd/podorel
 go build -o ./bin/podorel-agent ./agent/cmd/podorel-agent
 
+podorel_step "Preparing target user home"
+install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.config" "${TARGET_HOME}/.local" "${TARGET_HOME}/.local/share"
+
 podorel_step "Installing binaries"
-install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_USER" "${TARGET_HOME}/.local/bin"
+install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local/bin"
 install -m 0755 ./bin/podorel /usr/local/bin/podorel
 install -m 0755 ./bin/podorel-agent "${TARGET_HOME}/.local/bin/podorel-agent"
-chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.local/bin/podorel-agent"
+chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.local/bin/podorel-agent"
 
 podorel_step "Creating persistent directories"
-install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "${TARGET_HOME}/.local/share/podorel" "${TARGET_HOME}/.local/share/podorel/logs" "${TARGET_HOME}/.config/podorel"
+install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local/share/podorel" "${TARGET_HOME}/.local/share/podorel/logs" "${TARGET_HOME}/.config/podorel"
 if [ ! -f "${TARGET_HOME}/.config/podorel/agent-token" ]; then
   umask 077
   head -c 32 /dev/urandom | base64 > "${TARGET_HOME}/.config/podorel/agent-token"
-  chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/podorel/agent-token"
+  chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/podorel/agent-token"
 fi
 cat > "${TARGET_HOME}/.config/podorel/web.env" <<ENV
 PODOREL_ADMIN_PASSWORD=${PODOREL_ADMIN_PASSWORD}
@@ -126,24 +149,24 @@ PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock
 PODOREL_LOG_DIR=/app/data/logs
 ENV
 chmod 0600 "${TARGET_HOME}/.config/podorel/web.env"
-chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/podorel/web.env"
+chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/podorel/web.env"
 
 podorel_step "Enabling linger"
 loginctl enable-linger "$TARGET_USER"
 
 podorel_step "Installing systemd user units"
-install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_USER" "${TARGET_HOME}/.config/systemd/user"
+install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.config/systemd/user"
 install -m 0644 packaging/systemd/podorel-agent.service "${TARGET_HOME}/.config/systemd/user/podorel-agent.service"
 install -m 0644 packaging/systemd/podorel-web.service "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
-chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/systemd/user/podorel-agent.service" "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
+chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/systemd/user/podorel-agent.service" "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
 
 podorel_step "Building web image"
-sudo -u "$TARGET_USER" podman build -t podorel-web:latest -f packaging/podman/Containerfile.web .
+run_as_target_user podman build -t podorel-web:latest -f packaging/podman/Containerfile.web .
 
 podorel_step "Starting user services"
-sudo -u "$TARGET_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$TARGET_USER")" systemctl --user daemon-reload
-sudo -u "$TARGET_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$TARGET_USER")" systemctl --user enable --now podorel-agent.service
-sudo -u "$TARGET_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$TARGET_USER")" systemctl --user enable --now podorel-web.service
+run_as_target_user systemctl --user daemon-reload
+run_as_target_user systemctl --user enable --now podorel-agent.service
+run_as_target_user systemctl --user enable --now podorel-web.service
 
 podorel_step "Final URL"
 echo "PoDorel: ${PODOREL_PUBLIC_URL:-http://podorel.lan:8080}"

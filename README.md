@@ -21,7 +21,10 @@ reverse proxy, VPN, or tunnel if you need HTTPS or remote access.
 
 ### Install
 
-Install from a fresh clone on the target machine:
+Install from a fresh clone on the target machine. Run this as the Linux user
+that should own rootless Podman; the installer will ask for sudo when it needs
+system-level changes. If you are already in a root shell, pass
+`--target-user USER`.
 
 ```bash
 git clone https://github.com/curly-hub/podorel.git
@@ -83,6 +86,8 @@ production workloads.
 - `docs/`: architecture, operations, security, troubleshooting, and known limits.
 
 ### Run Checks
+
+Development and source installs require a Go 1.23-compatible toolchain.
 
 ```bash
 scripts/test-all.sh

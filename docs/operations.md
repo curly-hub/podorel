@@ -9,6 +9,11 @@ common local operations.
 ./install.sh --yes --public-url http://podorel.lan:8080
 ```
 
+Run the installer as the Linux user that should own rootless Podman. The script
+will ask for sudo when it needs system-level changes. If you are already in a
+root shell, pass `--target-user USER` so production services are not installed
+for root.
+
 Use a dry run to check prerequisites and generated steps without installing:
 
 ```bash

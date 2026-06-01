@@ -111,10 +111,12 @@ scripts/deploy-prod.sh
 
 if [ "$GENERATED_PASSWORD" = "1" ]; then
   TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
-  install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "${TARGET_HOME}/.config/podorel"
+  TARGET_GROUP="$(id -gn "$TARGET_USER")"
+  install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.config"
+  install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.config/podorel"
   printf '%s\n' "$ADMIN_PASSWORD" > "${TARGET_HOME}/.config/podorel/generated-admin-password"
   chmod 0600 "${TARGET_HOME}/.config/podorel/generated-admin-password"
-  chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/podorel/generated-admin-password"
+  chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/podorel/generated-admin-password"
   podorel_step "Generated admin password"
   echo "Saved to ${TARGET_HOME}/.config/podorel/generated-admin-password"
   echo "$ADMIN_PASSWORD"

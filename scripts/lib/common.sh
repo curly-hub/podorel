@@ -46,6 +46,40 @@ podorel_require_command() {
   fi
 }
 
+podorel_go_minor_value() {
+  local version="${1#go}"
+  local major="${version%%.*}"
+  local rest="${version#*.}"
+  local minor="${rest%%.*}"
+  if [[ ! "$major" =~ ^[0-9]+$ || ! "$minor" =~ ^[0-9]+$ ]]; then
+    echo "Could not parse Go version: $1" >&2
+    return 1
+  fi
+  echo $((major * 1000 + minor))
+}
+
+podorel_require_go_version_for_module() {
+  local mod_file="${1:-go.mod}"
+  local required
+  required="$(sed -n 's/^go //p' "$mod_file" | head -n 1)"
+  if [ "$required" = "" ]; then
+    echo "Could not determine required Go version from ${mod_file}" >&2
+    return 1
+  fi
+  local active
+  active="$(go env GOVERSION | sed 's/^go//')"
+  local required_value
+  local active_value
+  required_value="$(podorel_go_minor_value "$required")"
+  active_value="$(podorel_go_minor_value "$active")"
+  if [ "$active_value" -lt "$required_value" ]; then
+    echo "PoDorel requires Go ${required} or newer; active Go toolchain is go${active}." >&2
+    echo "Install Go ${required}+ or allow the Go toolchain auto-download before running the installer." >&2
+    return 1
+  fi
+  echo "Go toolchain: go${active} (module requires go ${required})"
+}
+
 podorel_detect_os_id() {
   if [ ! -r /etc/os-release ]; then
     echo "$PODOREL_UNSUPPORTED_DISTRO_MESSAGE" >&2

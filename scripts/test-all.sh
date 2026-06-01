@@ -39,7 +39,23 @@ cd "$ROOT_DIR"
 podorel_step "Checking required local tools"
 podorel_require_command bash
 podorel_require_command go
+podorel_require_go_version_for_module go.mod
 podorel_require_command node
+
+podorel_step "Checking Go version alignment"
+GO_MOD_VERSION="$(sed -n 's/^go //p' go.mod | head -n 1)"
+GO_WORK_VERSION="$(sed -n 's/^go //p' go.work | head -n 1)"
+GO_MOD_MINOR="$(printf '%s\n' "$GO_MOD_VERSION" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')"
+GO_WORK_MINOR="$(printf '%s\n' "$GO_WORK_VERSION" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')"
+CONTAINER_GO_VERSION="$(sed -n 's/^FROM .*golang:\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' packaging/podman/Containerfile.web | head -n 1)"
+if [ "$GO_MOD_MINOR" != "$GO_WORK_MINOR" ]; then
+  echo "go.mod and go.work must use the same Go minor version: ${GO_MOD_VERSION} != ${GO_WORK_VERSION}" >&2
+  exit 1
+fi
+if [ "$GO_MOD_MINOR" != "$CONTAINER_GO_VERSION" ]; then
+  echo "Containerfile.web builder Go minor version must match go.mod: ${CONTAINER_GO_VERSION} != ${GO_MOD_MINOR}" >&2
+  exit 1
+fi
 
 podorel_step "Checking Go formatting"
 mapfile -t GO_FILES < <(gofmt -l $(find . -path ./ui/node_modules -prune -o -name '*.go' -print))
