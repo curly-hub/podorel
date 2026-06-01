@@ -203,7 +203,7 @@
       </mat-card-header>
       <mat-card-content>
         <div class="table-wrap">
-          <table mat-table [dataSource]="findings()">
+          <table mat-table [dataSource]="findingsList()">
             <ng-container matColumnDef="severity">
               <th mat-header-cell *matHeaderCellDef>Severity</th>
               <td mat-cell *matCellDef="let finding"><span [class]="findingSeverityClass(finding)">{{ finding.severity || 'unknown' }}</span></td>
@@ -231,7 +231,7 @@
             <tr mat-row *matRowDef="let row; columns: displayedFindingColumns;"></tr>
           </table>
         </div>
-        @if (!findings().length) {
+        @if (!findingsList().length) {
           <p class="empty-state">No findings recorded.</p>
         }
       </mat-card-content>
@@ -244,7 +244,7 @@
       </mat-card-header>
       <mat-card-content>
         <div class="table-wrap">
-          <table mat-table [dataSource]="imageDigests()">
+          <table mat-table [dataSource]="imageDigestList()">
             <ng-container matColumnDef="image">
               <th mat-header-cell *matHeaderCellDef>Image</th>
               <td mat-cell *matCellDef="let digest">{{ digest.image_name }}</td>
@@ -261,7 +261,7 @@
             <tr mat-row *matRowDef="let row; columns: displayedDigestColumns;"></tr>
           </table>
         </div>
-        @if (!imageDigests().length) {
+        @if (!imageDigestList().length) {
           <p class="empty-state">No digest checks recorded.</p>
         }
       </mat-card-content>
@@ -274,7 +274,7 @@
       </mat-card-header>
       <mat-card-content>
         <div class="table-wrap">
-          <table mat-table [dataSource]="hostUpdates()">
+          <table mat-table [dataSource]="hostUpdateList()">
             <ng-container matColumnDef="package">
               <th mat-header-cell *matHeaderCellDef>Package</th>
               <td mat-cell *matCellDef="let update">{{ update.package_name }}</td>
@@ -295,7 +295,7 @@
             <tr mat-row *matRowDef="let row; columns: displayedPackageColumns;"></tr>
           </table>
         </div>
-        @if (!hostUpdates().length) {
+        @if (!hostUpdateList().length) {
           <p class="empty-state">No host package updates recorded.</p>
         }
       </mat-card-content>

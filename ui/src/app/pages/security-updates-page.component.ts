@@ -137,9 +137,9 @@ sudo dnf -y install trivy`,
       this.summary.set(summary);
       this.scannerOptions.set(scannerOptions);
       this.scanResult.set(null);
-      this.findings.set(findings);
-      this.imageDigests.set(imageDigests);
-      this.hostUpdates.set(hostUpdates);
+      this.findings.set(this.arrayOrEmpty(findings));
+      this.imageDigests.set(this.arrayOrEmpty(imageDigests));
+      this.hostUpdates.set(this.arrayOrEmpty(hostUpdates));
     } catch (error) {
       this.error.set(this.formatError(error));
     }
@@ -152,7 +152,7 @@ sudo dnf -y install trivy`,
       const scan = await this.api.scanSecurity();
       this.scanResult.set(scan);
       const findings = await this.api.securityFindings(scan.id);
-      this.findings.set(findings);
+      this.findings.set(this.arrayOrEmpty(findings));
       await this.refresh();
     } catch (error) {
       this.error.set(this.formatError(error));
@@ -347,17 +347,29 @@ sudo dnf -y install trivy`,
     return `${path} --version`;
   }
 
+  findingsList(): SecurityFinding[] {
+    return this.arrayOrEmpty(this.findings());
+  }
+
+  imageDigestList(): ImageDigest[] {
+    return this.arrayOrEmpty(this.imageDigests());
+  }
+
+  hostUpdateList(): HostPackageUpdate[] {
+    return this.arrayOrEmpty(this.hostUpdates());
+  }
+
   findingCountLabel(): string {
-    return this.countLabel(this.findings().length, 'finding');
+    return this.countLabel(this.findingsList().length, 'finding');
   }
 
   digestIssueCountLabel(): string {
-    const count = this.imageDigests().filter((digest) => digest.update_available || !!digest.error_message).length;
+    const count = this.imageDigestList().filter((digest) => digest.update_available || !!digest.error_message).length;
     return this.countLabel(count, 'image issue');
   }
 
   hostUpdateCountLabel(): string {
-    const count = this.hostUpdates().filter((update) => update.update_available).length;
+    const count = this.hostUpdateList().filter((update) => update.update_available).length;
     return this.countLabel(count, 'package update');
   }
 
@@ -434,6 +446,10 @@ sudo dnf -y install trivy`,
 
   private countLabel(count: number, noun: string): string {
     return `${count} ${noun}${count === 1 ? '' : 's'}`;
+  }
+
+  private arrayOrEmpty<T>(value: T[] | null | undefined): T[] {
+    return Array.isArray(value) ? value : [];
   }
 
   private humanize(value: string): string {

@@ -168,3 +168,32 @@ func TestSecretMetadataDoesNotStoreRawSecret(t *testing.T) {
 		t.Fatalf("secret metadata leaked raw value: %#v", secrets)
 	}
 }
+
+func TestSecurityListsReturnEmptySlices(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+
+	findings, err := store.ListSecurityFindings(ctx, "", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findings == nil || len(findings) != 0 {
+		t.Fatalf("findings = %#v", findings)
+	}
+
+	digests, err := store.ListImageDigests(ctx, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digests == nil || len(digests) != 0 {
+		t.Fatalf("digests = %#v", digests)
+	}
+
+	updates, err := store.ListHostPackageUpdates(ctx, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updates == nil || len(updates) != 0 {
+		t.Fatalf("updates = %#v", updates)
+	}
+}

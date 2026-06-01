@@ -1077,7 +1077,7 @@ func (s *Store) ListSecurityFindings(ctx context.Context, scanID string, limit i
 		return nil, err
 	}
 	defer rows.Close()
-	var findings []SecurityFinding
+	findings := []SecurityFinding{}
 	for rows.Next() {
 		var finding SecurityFinding
 		if err := rows.Scan(&finding.ID, &finding.ScanID, &finding.ImageDigest, &finding.Target, &finding.VulnerabilityID, &finding.Severity, &finding.Title, &finding.PackageName, &finding.InstalledVersion, &finding.FixedVersion, &finding.RawJSON); err != nil {
@@ -1108,7 +1108,7 @@ func (s *Store) ListImageDigests(ctx context.Context, limit int) ([]ImageDigest,
 		return nil, err
 	}
 	defer rows.Close()
-	var digests []ImageDigest
+	digests := []ImageDigest{}
 	for rows.Next() {
 		var digest ImageDigest
 		var checked string
@@ -1143,7 +1143,7 @@ func (s *Store) ListHostPackageUpdates(ctx context.Context, limit int) ([]HostPa
 		return nil, err
 	}
 	defer rows.Close()
-	var updates []HostPackageUpdate
+	updates := []HostPackageUpdate{}
 	for rows.Next() {
 		var update HostPackageUpdate
 		var checked string
