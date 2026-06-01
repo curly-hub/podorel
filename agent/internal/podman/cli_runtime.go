@@ -59,11 +59,16 @@ func (r *PodmanCLIRuntime) ListPods(ctx context.Context) ([]PodSummary, error) {
 	}
 	pods := make([]PodSummary, 0, len(rows))
 	for _, row := range rows {
+		health := healthFromPodmanRow(row)
+		if health != "" {
+			row["Health"] = health
+		}
 		raw, _ := json.Marshal(row)
 		pods = append(pods, PodSummary{
 			ID:        optionalStringField(row, "Id", "ID", "id"),
 			Name:      optionalStringField(row, "Name", "name"),
 			State:     optionalStringField(row, "Status", "status", "State", "state"),
+			Health:    health,
 			CreatedAt: optionalTimeField(row, "Created", "CreatedAt", "created", "created_at"),
 			RawJSON:   string(raw),
 		})
@@ -82,6 +87,10 @@ func (r *PodmanCLIRuntime) ListContainers(ctx context.Context) ([]ContainerSumma
 	}
 	containers := make([]ContainerSummary, 0, len(rows))
 	for _, row := range rows {
+		health := healthFromPodmanRow(row)
+		if health != "" {
+			row["Health"] = health
+		}
 		raw, _ := json.Marshal(row)
 		containers = append(containers, ContainerSummary{
 			ID:        optionalStringField(row, "Id", "ID", "id"),
@@ -89,6 +98,7 @@ func (r *PodmanCLIRuntime) ListContainers(ctx context.Context) ([]ContainerSumma
 			Name:      optionalStringField(row, "Names", "Name", "name"),
 			Image:     optionalStringField(row, "Image", "image"),
 			State:     optionalStringField(row, "State", "state", "Status", "status"),
+			Health:    health,
 			CreatedAt: optionalTimeField(row, "Created", "CreatedAt", "created", "created_at"),
 			RawJSON:   string(raw),
 		})

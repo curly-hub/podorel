@@ -49,6 +49,7 @@ type PodSummary struct {
 	Name      string    `json:"Name,omitempty"`
 	State     string    `json:"State,omitempty"`
 	Status    string    `json:"Status,omitempty"`
+	Health    string    `json:"Health,omitempty"`
 	CreatedAt time.Time `json:"CreatedAt,omitempty"`
 	RawJSON   string    `json:"RawJSON,omitempty"`
 }
@@ -60,6 +61,8 @@ type ContainerSummary struct {
 	Name      string    `json:"Name,omitempty"`
 	Image     string    `json:"Image,omitempty"`
 	State     string    `json:"State,omitempty"`
+	Status    string    `json:"Status,omitempty"`
+	Health    string    `json:"Health,omitempty"`
 	CreatedAt time.Time `json:"CreatedAt,omitempty"`
 	RawJSON   string    `json:"RawJSON,omitempty"`
 }

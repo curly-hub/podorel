@@ -91,6 +91,40 @@ func TestOptionalTimeFieldParsesPodmanFormats(t *testing.T) {
 	}
 }
 
+func TestHealthFromPodmanRow(t *testing.T) {
+	tests := []struct {
+		name string
+		row  map[string]any
+		want string
+	}{
+		{
+			name: "status text",
+			row:  map[string]any{"Status": "Up 7 minutes (healthy)"},
+			want: "healthy",
+		},
+		{
+			name: "inspect state health",
+			row: map[string]any{"State": map[string]any{
+				"Health": map[string]any{"Status": "unhealthy"},
+			}},
+			want: "unhealthy",
+		},
+		{
+			name: "no healthcheck",
+			row:  map[string]any{"Status": "Up 7 minutes"},
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := healthFromPodmanRow(tt.row); got != tt.want {
+				t.Fatalf("health = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseStatsRejectsMalformed(t *testing.T) {
 	if _, err := ParseStatsJSON([]byte(`{"not": "an array"`), 4); err == nil {
 		t.Fatal("expected malformed stats to fail")

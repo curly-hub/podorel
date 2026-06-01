@@ -93,6 +93,7 @@ func (a *App) refreshAgentSnapshots(ctx context.Context, agentID string) error {
 	if err := a.store.TouchAgent(ctx, agentID, "online"); err != nil {
 		return err
 	}
+	podRecords := make([]db.Pod, 0, len(pods))
 	for _, pod := range pods {
 		id := firstNonEmpty(pod.ID, pod.Id)
 		if id == "" {
@@ -103,24 +104,24 @@ func (a *App) refreshAgentSnapshots(ctx context.Context, agentID string) error {
 			name = id
 		}
 		state := firstNonEmpty(pod.State, pod.Status, "unknown")
-		if err := a.store.InsertPod(ctx, db.Pod{
+		podRecords = append(podRecords, db.Pod{
 			ID:          id,
 			AgentID:     agentID,
 			PodmanPodID: id,
 			Name:        name,
 			State:       state,
-			Health:      "unknown",
+			Health:      observedHealth(pod.Health),
 			CreatedAt:   pod.CreatedAt,
 			RawJSON:     pod.RawJSON,
-		}); err != nil {
-			return err
-		}
+		})
 	}
 	containers, err := client.ListContainers(ctx)
 	if err != nil {
 		return err
 	}
 	containerIndex := newContainerSnapshotIndex(containers)
+	containerRecords := make([]db.Container, 0, len(containers))
+	containersByPod := map[string][]db.Container{}
 	for _, container := range containers {
 		id := firstNonEmpty(container.ID, container.Id)
 		if id == "" {
@@ -130,18 +131,32 @@ func (a *App) refreshAgentSnapshots(ctx context.Context, agentID string) error {
 		if name == "" {
 			name = id
 		}
-		if err := a.store.InsertContainer(ctx, db.Container{
+		state := firstNonEmpty(container.State, container.Status, "unknown")
+		record := db.Container{
 			ID:                id,
 			AgentID:           agentID,
 			PodID:             container.PodID,
 			PodmanContainerID: id,
 			Name:              name,
 			Image:             container.Image,
-			State:             firstNonEmpty(container.State, "unknown"),
-			Health:            "unknown",
+			State:             state,
+			Health:            observedHealth(container.Health),
 			CreatedAt:         container.CreatedAt,
 			RawJSON:           container.RawJSON,
-		}); err != nil {
+		}
+		containerRecords = append(containerRecords, record)
+		if record.PodID != "" {
+			containersByPod[record.PodID] = append(containersByPod[record.PodID], record)
+		}
+	}
+	for _, pod := range podRecords {
+		pod.Health = aggregatePodHealth(pod.Health, containersByPod[pod.ID])
+		if err := a.store.InsertPod(ctx, pod); err != nil {
+			return err
+		}
+	}
+	for _, container := range containerRecords {
+		if err := a.store.InsertContainer(ctx, container); err != nil {
 			return err
 		}
 	}
@@ -180,6 +195,50 @@ func (a *App) refreshAgentSnapshots(ctx context.Context, agentID string) error {
 		}
 	}
 	return nil
+}
+
+func observedHealth(value string) string {
+	if health := normalizeObservedHealth(value); health != "" {
+		return health
+	}
+	return "unknown"
+}
+
+func aggregatePodHealth(podHealth string, containers []db.Container) string {
+	if health := normalizeObservedHealth(podHealth); health == "unhealthy" || health == "starting" {
+		return health
+	}
+	sawHealthy := false
+	sawStarting := false
+	for _, container := range containers {
+		switch normalizeObservedHealth(container.Health) {
+		case "unhealthy":
+			return "unhealthy"
+		case "starting":
+			sawStarting = true
+		case "healthy":
+			sawHealthy = true
+		}
+	}
+	if sawStarting {
+		return "starting"
+	}
+	if sawHealthy {
+		return "healthy"
+	}
+	return observedHealth(podHealth)
+}
+
+func normalizeObservedHealth(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "healthy":
+		return "healthy"
+	case "unhealthy":
+		return "unhealthy"
+	case "starting":
+		return "starting"
+	}
+	return ""
 }
 
 type resolvedAgentStat struct {

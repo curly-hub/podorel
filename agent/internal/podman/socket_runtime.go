@@ -79,11 +79,16 @@ func (r *PodmanSocketRuntime) ListPods(ctx context.Context) ([]PodSummary, error
 	}
 	pods := make([]PodSummary, 0, len(rows))
 	for _, row := range rows {
+		health := healthFromPodmanRow(row)
+		if health != "" {
+			row["Health"] = health
+		}
 		rowRaw, _ := json.Marshal(row)
 		pods = append(pods, PodSummary{
 			ID:        optionalStringField(row, "Id", "ID", "id"),
 			Name:      optionalStringField(row, "Name", "name"),
 			State:     optionalStringField(row, "Status", "status", "State", "state"),
+			Health:    health,
 			CreatedAt: optionalTimeField(row, "Created", "CreatedAt", "created", "created_at"),
 			RawJSON:   string(rowRaw),
 		})
@@ -102,18 +107,39 @@ func (r *PodmanSocketRuntime) ListContainers(ctx context.Context) ([]ContainerSu
 	}
 	containers := make([]ContainerSummary, 0, len(rows))
 	for _, row := range rows {
+		id := optionalStringField(row, "Id", "ID", "id")
+		health := healthFromPodmanRow(row)
+		if health == "" && id != "" {
+			health = r.inspectContainerHealth(ctx, id)
+		}
+		if health != "" {
+			row["Health"] = health
+		}
 		rowRaw, _ := json.Marshal(row)
 		containers = append(containers, ContainerSummary{
-			ID:        optionalStringField(row, "Id", "ID", "id"),
+			ID:        id,
 			PodID:     optionalStringField(row, "Pod", "pod", "PodID", "pod_id"),
 			Name:      optionalStringField(row, "Names", "Name", "name"),
 			Image:     optionalStringField(row, "Image", "image"),
 			State:     optionalStringField(row, "State", "state", "Status", "status"),
+			Health:    health,
 			CreatedAt: optionalTimeField(row, "Created", "CreatedAt", "created", "created_at"),
 			RawJSON:   string(rowRaw),
 		})
 	}
 	return containers, nil
+}
+
+func (r *PodmanSocketRuntime) inspectContainerHealth(ctx context.Context, id string) string {
+	raw, err := r.do(ctx, http.MethodGet, "/libpod/containers/"+url.PathEscape(id)+"/json", nil)
+	if err != nil {
+		return ""
+	}
+	var row map[string]any
+	if err := json.Unmarshal(raw, &row); err != nil {
+		return ""
+	}
+	return healthFromPodmanRow(row)
 }
 
 func (r *PodmanSocketRuntime) Stats(ctx context.Context) ([]ContainerStats, error) {

@@ -242,3 +242,64 @@ func optionalStringField(row map[string]any, keys ...string) string {
 	}
 	return ""
 }
+
+func healthFromPodmanRow(row map[string]any) string {
+	if health := normalizeHealth(optionalStringField(row, "Health", "health", "HealthStatus", "health_status")); health != "" {
+		return health
+	}
+	if health := nestedHealthStatus(row["State"]); health != "" {
+		return health
+	}
+	if health := nestedHealthStatus(row["state"]); health != "" {
+		return health
+	}
+	if health := healthFromStatusText(optionalStringField(row, "Status", "status")); health != "" {
+		return health
+	}
+	return ""
+}
+
+func nestedHealthStatus(value any) string {
+	state, ok := value.(map[string]any)
+	if !ok {
+		return ""
+	}
+	if health := normalizeHealth(optionalStringField(state, "Health", "health")); health != "" {
+		return health
+	}
+	for _, key := range []string{"Health", "health"} {
+		healthValue, ok := state[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		if health := normalizeHealth(optionalStringField(healthValue, "Status", "status")); health != "" {
+			return health
+		}
+	}
+	return ""
+}
+
+func healthFromStatusText(value string) string {
+	text := strings.ToLower(strings.TrimSpace(value))
+	switch {
+	case strings.Contains(text, "unhealthy"):
+		return "unhealthy"
+	case strings.Contains(text, "(healthy)") || strings.Contains(text, "health: healthy"):
+		return "healthy"
+	case strings.Contains(text, "health: starting") || strings.Contains(text, "(starting)"):
+		return "starting"
+	}
+	return ""
+}
+
+func normalizeHealth(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "healthy":
+		return "healthy"
+	case "unhealthy":
+		return "unhealthy"
+	case "starting":
+		return "starting"
+	}
+	return ""
+}

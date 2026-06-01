@@ -31,6 +31,7 @@ type PodSummary struct {
 	ID        string
 	Name      string
 	State     string
+	Health    string
 	CreatedAt time.Time
 	RawJSON   string
 }
@@ -41,6 +42,7 @@ type ContainerSummary struct {
 	Name      string
 	Image     string
 	State     string
+	Health    string
 	CreatedAt time.Time
 	RawJSON   string
 }

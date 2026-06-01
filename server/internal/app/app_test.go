@@ -979,6 +979,18 @@ func (f *statsInferenceAgentClient) Stats(ctx context.Context) ([]agents.Contain
 	return append([]agents.ContainerStats(nil), f.stats...), nil
 }
 
+func TestAggregatePodHealthUsesContainerHealth(t *testing.T) {
+	if got := aggregatePodHealth("unknown", []db.Container{{Health: "healthy"}, {Health: "unknown"}}); got != "healthy" {
+		t.Fatalf("pod health = %q, want healthy", got)
+	}
+	if got := aggregatePodHealth("healthy", []db.Container{{Health: "unhealthy"}}); got != "unhealthy" {
+		t.Fatalf("pod health = %q, want unhealthy", got)
+	}
+	if got := aggregatePodHealth("unknown", []db.Container{{Health: "unknown"}}); got != "unknown" {
+		t.Fatalf("pod health = %q, want unknown", got)
+	}
+}
+
 func (f *fakeAgentClient) Health(ctx context.Context) (agents.Health, error) {
 	return agents.Health{Status: "ok", Mode: "development", User: "test"}, nil
 }
