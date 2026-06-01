@@ -129,6 +129,7 @@ func (s Server) routes() http.Handler {
 	mux.HandleFunc("POST /secrets", s.withRuntime(s.handleCreateSecret))
 	mux.HandleFunc("GET /security/scanner", s.handleScannerStatus)
 	mux.HandleFunc("POST /security/scan-image", s.handleScanImage)
+	mux.HandleFunc("POST /security/image-digest", s.handleImageDigest)
 	return mux
 }
 

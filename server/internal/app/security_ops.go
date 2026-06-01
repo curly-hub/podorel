@@ -223,6 +223,13 @@ func (a *App) containerImages(ctx context.Context, agentID string) ([]string, er
 }
 
 func (a *App) recordImageDigestChecks(ctx context.Context, agentID string, images []string) {
+	if err := a.store.DeleteImageDigests(ctx, agentID); err != nil {
+		a.logger.Error(ctx, "image_digest_cleanup", "could not clear previous image digest checks", map[string]any{"agent_id": agentID, "error": err.Error()})
+	}
+	if _, client, ok, err := a.agentClient(ctx, agentID); err == nil && ok {
+		a.recordAgentImageDigestChecks(ctx, client, agentID, images)
+		return
+	}
 	podmanPath, podmanErr := exec.LookPath("podman")
 	skopeoPath, skopeoErr := exec.LookPath("skopeo")
 	for _, image := range images {
@@ -243,6 +250,24 @@ func (a *App) recordImageDigestChecks(ctx context.Context, agentID string, image
 		} else {
 			digest.ErrorMessage = "skopeo unavailable for remote digest check"
 		}
+		status := security.CompareImageDigest(image, digest.LocalDigest, digest.RemoteDigest)
+		digest.UpdateAvailable = status.UpdateAvailable
+		_ = a.store.InsertImageDigest(ctx, digest)
+	}
+}
+
+func (a *App) recordAgentImageDigestChecks(ctx context.Context, client AgentClient, agentID string, images []string) {
+	for _, image := range images {
+		digest := db.ImageDigest{AgentID: agentID, ImageName: image, CheckedAt: a.now()}
+		result, err := client.ImageDigest(ctx, agents.ImageDigestRequest{Image: image})
+		if err != nil {
+			digest.ErrorMessage = err.Error()
+			_ = a.store.InsertImageDigest(ctx, digest)
+			continue
+		}
+		digest.LocalDigest = result.LocalDigest
+		digest.RemoteDigest = result.RemoteDigest
+		digest.ErrorMessage = result.Error
 		status := security.CompareImageDigest(image, digest.LocalDigest, digest.RemoteDigest)
 		digest.UpdateAvailable = status.UpdateAvailable
 		_ = a.store.InsertImageDigest(ctx, digest)

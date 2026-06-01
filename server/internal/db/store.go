@@ -1099,6 +1099,14 @@ func (s *Store) InsertImageDigest(ctx context.Context, digest ImageDigest) error
 	return err
 }
 
+func (s *Store) DeleteImageDigests(ctx context.Context, agentID string) error {
+	if agentID == "" {
+		agentID = PrimaryAgentID
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM image_digests WHERE agent_id = ?`, agentID)
+	return err
+}
+
 func (s *Store) ListImageDigests(ctx context.Context, limit int) ([]ImageDigest, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100

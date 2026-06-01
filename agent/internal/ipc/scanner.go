@@ -37,6 +37,17 @@ type scanImageResult struct {
 	RawJSON        string `json:"raw_json"`
 }
 
+type imageDigestRequest struct {
+	Image string `json:"image"`
+}
+
+type imageDigestResult struct {
+	Image        string `json:"image"`
+	LocalDigest  string `json:"local_digest"`
+	RemoteDigest string `json:"remote_digest"`
+	Error        string `json:"error"`
+}
+
 func (s Server) handleScannerStatus(w http.ResponseWriter, r *http.Request) {
 	scanner := strings.TrimSpace(r.URL.Query().Get("scanner"))
 	writeResult(w, resolveScannerStatus(r.Context(), scanner), nil)
@@ -72,6 +83,38 @@ func (s Server) handleScanImage(w http.ResponseWriter, r *http.Request) {
 	}, nil)
 }
 
+func (s Server) handleImageDigest(w http.ResponseWriter, r *http.Request) {
+	var req imageDigestRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "invalid json"})
+		return
+	}
+	image := strings.TrimSpace(req.Image)
+	if image == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "image is required"})
+		return
+	}
+	result := imageDigestResult{Image: image}
+	podmanPath, err := lookupHostCommand("podman")
+	if err != nil {
+		result.Error = "podman CLI unavailable on host agent for local digest check"
+		writeResult(w, result, nil)
+		return
+	}
+	result.LocalDigest = strings.TrimSpace(string(mustScannerCommandOutput(r.Context(), podmanPath, "image", "inspect", "--format", "{{.Digest}}", image)))
+	if result.LocalDigest == "" {
+		result.Error = "local image digest unavailable"
+		writeResult(w, result, nil)
+		return
+	}
+	if skopeoPath, err := lookupHostCommand("skopeo"); err == nil {
+		result.RemoteDigest = strings.TrimSpace(string(mustScannerCommandOutput(r.Context(), skopeoPath, "inspect", "--format", "{{.Digest}}", "docker://"+image)))
+	} else {
+		result.Error = "skopeo unavailable on host agent for remote digest check"
+	}
+	writeResult(w, result, nil)
+}
+
 func scanImageWithScanner(ctx context.Context, status scannerStatus, image string) ([]byte, error) {
 	if status.Scanner == "trivy" {
 		raw, archiveErr := scanTrivyPodmanArchive(ctx, status.Path, image)
@@ -88,7 +131,7 @@ func scanImageWithScanner(ctx context.Context, status scannerStatus, image strin
 }
 
 func scanTrivyPodmanArchive(ctx context.Context, trivyPath string, image string) ([]byte, error) {
-	podmanPath, err := exec.LookPath("podman")
+	podmanPath, err := lookupHostCommand("podman")
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +182,22 @@ func lookupSecurityScanner(scanner string) (string, error) {
 	return "", err
 }
 
+func lookupHostCommand(name string) (string, error) {
+	path, err := exec.LookPath(name)
+	if err == nil {
+		return path, nil
+	}
+	if strings.Contains(name, string(os.PathSeparator)) {
+		return "", err
+	}
+	for _, candidate := range []string{"/usr/local/bin/" + name, "/usr/bin/" + name, "/bin/" + name} {
+		if path, candidateErr := exec.LookPath(candidate); candidateErr == nil {
+			return path, nil
+		}
+	}
+	return "", err
+}
+
 func scannerUnavailableMessage(scanner string) string {
 	return fmt.Sprintf("%s is not installed or not on the host agent PATH. Install Trivy on the host, or set Security scanner to an executable path in Settings.", scanner)
 }
@@ -164,4 +223,12 @@ func scannerCommandOutput(ctx context.Context, name string, args ...string) ([]b
 		return stdout.Bytes(), fmt.Errorf("%s %s failed: %w: %s", name, strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.Bytes(), nil
+}
+
+func mustScannerCommandOutput(ctx context.Context, name string, args ...string) []byte {
+	raw, err := scannerCommandOutput(ctx, name, args...)
+	if err != nil {
+		return nil
+	}
+	return raw
 }

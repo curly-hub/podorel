@@ -377,6 +377,10 @@ func (f *fakeAgent) ScanImage(ctx context.Context, req agents.ScanImageRequest) 
 	return agents.ScanImageResult{}, errors.New("scanner unavailable")
 }
 
+func (f *fakeAgent) ImageDigest(ctx context.Context, req agents.ImageDigestRequest) (agents.ImageDigestResult, error) {
+	return agents.ImageDigestResult{Image: req.Image, LocalDigest: "sha256:e2e", RemoteDigest: "sha256:e2e"}, nil
+}
+
 func writeRealE2ETemplate(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

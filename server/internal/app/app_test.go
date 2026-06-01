@@ -246,6 +246,37 @@ func TestSecurityScanUnavailableIsExplicitSetupState(t *testing.T) {
 	}
 }
 
+func TestImageDigestChecksUseAgent(t *testing.T) {
+	fake := &fakeAgentClient{}
+	harness := newTestHarnessWithAgentClient(t, fake)
+	if err := harness.store.InsertImageDigest(context.Background(), db.ImageDigest{
+		AgentID:      db.PrimaryAgentID,
+		ImageName:    "old-image:latest",
+		ErrorMessage: "podman CLI unavailable for local digest check",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	harness.app.recordImageDigestChecks(context.Background(), db.PrimaryAgentID, []string{"alpine:3.20"})
+
+	if len(fake.digestRequests) != 1 || fake.digestRequests[0] != "alpine:3.20" {
+		t.Fatalf("digest checks did not use agent: %#v", fake.digestRequests)
+	}
+	digests, err := harness.store.ListImageDigests(context.Background(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digests) != 1 {
+		t.Fatalf("digests = %d, want 1", len(digests))
+	}
+	if digests[0].ErrorMessage == "podman CLI unavailable for local digest check" {
+		t.Fatalf("web-container podman error leaked into digest result: %#v", digests[0])
+	}
+	if digests[0].LocalDigest != "sha256:local" {
+		t.Fatalf("local digest = %q", digests[0].LocalDigest)
+	}
+}
+
 func TestCreateFromTemplateAndDockerfilePreview(t *testing.T) {
 	harness := newTestHarness(t)
 	login := harness.login(t)
@@ -857,6 +888,7 @@ type fakeAgentClient struct {
 	createdPods      []string
 	logLines         []agents.LogLine
 	logRequests      []string
+	digestRequests   []string
 }
 
 type failingRefreshAgentClient struct{}
@@ -919,6 +951,10 @@ func (failingRefreshAgentClient) ScannerStatus(ctx context.Context, scanner stri
 
 func (failingRefreshAgentClient) ScanImage(ctx context.Context, req agents.ScanImageRequest) (agents.ScanImageResult, error) {
 	return agents.ScanImageResult{}, errors.New("agent offline")
+}
+
+func (failingRefreshAgentClient) ImageDigest(ctx context.Context, req agents.ImageDigestRequest) (agents.ImageDigestResult, error) {
+	return agents.ImageDigestResult{}, errors.New("agent offline")
 }
 
 type statsInferenceAgentClient struct {
@@ -1011,6 +1047,11 @@ func (f *fakeAgentClient) ScannerStatus(ctx context.Context, scanner string) (ag
 
 func (f *fakeAgentClient) ScanImage(ctx context.Context, req agents.ScanImageRequest) (agents.ScanImageResult, error) {
 	return agents.ScanImageResult{}, errors.New("scanner unavailable")
+}
+
+func (f *fakeAgentClient) ImageDigest(ctx context.Context, req agents.ImageDigestRequest) (agents.ImageDigestResult, error) {
+	f.digestRequests = append(f.digestRequests, req.Image)
+	return agents.ImageDigestResult{Image: req.Image, LocalDigest: "sha256:local", RemoteDigest: "sha256:local"}, nil
 }
 
 func TestDevSupervisorStatusMissingFileIsFriendly(t *testing.T) {

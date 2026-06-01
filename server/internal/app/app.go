@@ -73,6 +73,7 @@ type AgentClient interface {
 	CreateSecret(ctx context.Context, req agents.CreateSecretRequest) error
 	ScannerStatus(ctx context.Context, scanner string) (agents.ScannerStatus, error)
 	ScanImage(ctx context.Context, req agents.ScanImageRequest) (agents.ScanImageResult, error)
+	ImageDigest(ctx context.Context, req agents.ImageDigestRequest) (agents.ImageDigestResult, error)
 }
 
 func New(ctx context.Context, cfg config.Config, store *db.Store, logger *logging.Logger, opts Options) (*App, error) {

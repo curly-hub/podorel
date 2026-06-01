@@ -197,6 +197,40 @@ func TestSecurityListsReturnEmptySlices(t *testing.T) {
 		t.Fatalf("updates = %#v", updates)
 	}
 }
+
+func TestDeleteImageDigestsClearsAgentRows(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+	if err := store.Bootstrap(ctx, "secret-password"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpsertAgent(ctx, Agent{
+		ID:            "secondary",
+		LinuxUsername: "alice",
+		LinuxUID:      1001,
+		SocketPath:    "/tmp/secondary.sock",
+		Status:        "online",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InsertImageDigest(ctx, ImageDigest{AgentID: PrimaryAgentID, ImageName: "alpine:3.20", ErrorMessage: "old"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InsertImageDigest(ctx, ImageDigest{AgentID: "secondary", ImageName: "busybox:latest", ErrorMessage: "keep"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteImageDigests(ctx, PrimaryAgentID); err != nil {
+		t.Fatal(err)
+	}
+	digests, err := store.ListImageDigests(ctx, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(digests) != 1 || digests[0].AgentID != "secondary" {
+		t.Fatalf("digests after delete = %#v", digests)
+	}
+}
+
 func TestSecurityFindingsOrderBySeverity(t *testing.T) {
 	store := testStore(t)
 	ctx := context.Background()

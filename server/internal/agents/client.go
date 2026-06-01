@@ -154,6 +154,17 @@ type ScanImageResult struct {
 	RawJSON        string `json:"raw_json"`
 }
 
+type ImageDigestRequest struct {
+	Image string `json:"image"`
+}
+
+type ImageDigestResult struct {
+	Image        string `json:"image"`
+	LocalDigest  string `json:"local_digest"`
+	RemoteDigest string `json:"remote_digest"`
+	Error        string `json:"error"`
+}
+
 func NewClient(socketPath string, token string) *Client {
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
@@ -301,6 +312,12 @@ func (c *Client) ScannerStatus(ctx context.Context, scanner string) (ScannerStat
 func (c *Client) ScanImage(ctx context.Context, req ScanImageRequest) (ScanImageResult, error) {
 	var result ScanImageResult
 	err := c.doEnvelope(ctx, http.MethodPost, "/security/scan-image", req, &result)
+	return result, err
+}
+
+func (c *Client) ImageDigest(ctx context.Context, req ImageDigestRequest) (ImageDigestResult, error) {
+	var result ImageDigestResult
+	err := c.doEnvelope(ctx, http.MethodPost, "/security/image-digest", req, &result)
 	return result, err
 }
 

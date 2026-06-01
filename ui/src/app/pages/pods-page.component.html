@@ -76,7 +76,14 @@
           <mat-chip-set class="chip-row">
             <mat-chip [class]="stateClass(pod)" [matTooltip]="helpTopics.state"><mat-icon>radio_button_checked</mat-icon>{{ pod.state }}</mat-chip>
             <mat-chip [matTooltip]="helpTopics.health"><mat-icon>health_and_safety</mat-icon>{{ pod.health || 'unknown' }}</mat-chip>
-            <mat-chip [matTooltip]="helpTopics.scan"><mat-icon>{{ securityScanIcon() }}</mat-icon>{{ securityScanLabel() }}</mat-chip>
+            <mat-chip [matTooltip]="helpTopics.scan">
+              @if (securityScanIcon() === 'verified') {
+                <mat-icon>verified</mat-icon>
+              } @else {
+                <mat-icon>security_update_warning</mat-icon>
+              }
+              {{ securityScanLabel() }}
+            </mat-chip>
             <mat-chip [matTooltip]="helpTopics.source"><mat-icon>sync_alt</mat-icon>{{ pod.snapshot_source || 'live' }}</mat-chip>
             @if (!agentOnline(pod)) {
               <mat-chip [matTooltip]="helpTopics.agentOffline"><mat-icon>cloud_off</mat-icon>agent offline</mat-chip>
