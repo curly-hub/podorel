@@ -231,7 +231,7 @@ install_packages() {
       apt-get install -y podman uidmap slirp4netns fuse-overlayfs sqlite3
       ;;
     fedora)
-      dnf install -y podman shadow-utils slirp4netns fuse-overlayfs sqlite
+      dnf install -y podman shadow-utils slirp4netns fuse-overlayfs sqlite firewalld
       ;;
   esac
 }
@@ -239,18 +239,87 @@ install_packages() {
 listen_port() {
   local addr="$1"
   local port="${addr##*:}"
-  if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+  if [[ ! "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
     echo "Could not determine listen port from ${addr}" >&2
     return 1
   fi
   echo "$port"
 }
 
+public_url_explicit_port() {
+  local url="$1"
+  local rest="$url"
+  if [[ "$rest" == *"://"* ]]; then
+    rest="${rest#*://}"
+  fi
+  local authority="${rest%%/*}"
+  authority="${authority##*@}"
+  if [[ "$authority" == \[*\]* ]]; then
+    local after_bracket="${authority#*]}"
+    if [[ "$after_bracket" =~ ^:([0-9]+)$ ]]; then
+      echo "${BASH_REMATCH[1]}"
+    fi
+    return 0
+  fi
+  if [[ "$authority" =~ :([0-9]+)$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+  fi
+}
+
+resolve_public_url_and_listen_addr() {
+  local public_port=""
+  if [ "$PUBLIC_URL" != "" ]; then
+    public_port="$(public_url_explicit_port "$PUBLIC_URL")"
+  fi
+  if [ "$LISTEN_ADDR" = "" ]; then
+    if [ "$public_port" != "" ]; then
+      LISTEN_ADDR="0.0.0.0:${public_port}"
+    else
+      LISTEN_ADDR="0.0.0.0:8080"
+    fi
+  fi
+  local listen_port_value
+  listen_port_value="$(listen_port "$LISTEN_ADDR")"
+  if [ "$PUBLIC_URL" = "" ]; then
+    PUBLIC_URL="http://podorel.lan:${listen_port_value}"
+  fi
+}
+
+configure_fedora_firewall() {
+  local os_id="$1"
+  local listen_port="$2"
+  if [ "$os_id" != "fedora" ]; then
+    return 0
+  fi
+  if [ "${PODOREL_SKIP_FIREWALL:-}" = "1" ]; then
+    echo "Skipping Fedora firewalld configuration because PODOREL_SKIP_FIREWALL=1."
+    return 0
+  fi
+  if ! command -v firewall-cmd >/dev/null 2>&1; then
+    echo "firewall-cmd is not installed; allow inbound TCP ${listen_port} manually if this host blocks LAN access."
+    return 0
+  fi
+  if ! firewall-cmd --state >/dev/null 2>&1; then
+    echo "firewalld is not running; allow inbound TCP ${listen_port} manually if another firewall blocks LAN access."
+    return 0
+  fi
+  if firewall-cmd --permanent --query-port="${listen_port}/tcp" >/dev/null 2>&1; then
+    if ! firewall-cmd --query-port="${listen_port}/tcp" >/dev/null 2>&1; then
+      firewall-cmd --reload
+    fi
+    echo "Fedora firewalld already allows TCP ${listen_port}."
+    return 0
+  fi
+  firewall-cmd --permanent --add-port="${listen_port}/tcp"
+  firewall-cmd --reload
+  echo "Fedora firewalld now allows TCP ${listen_port}."
+}
+
 YES=0
 DRY_RUN=0
 ADMIN_PASSWORD="${PODOREL_ADMIN_PASSWORD:-}"
 PUBLIC_URL="${PODOREL_PUBLIC_URL:-}"
-LISTEN_ADDR="${PODOREL_LISTEN_ADDR:-0.0.0.0:8080}"
+LISTEN_ADDR="${PODOREL_LISTEN_ADDR:-}"
 TARGET_USER="${PODOREL_INSTALL_TARGET_USER:-${SUDO_USER:-${USER}}}"
 ORIGINAL_ARGS=("$@")
 
@@ -309,6 +378,7 @@ if [ "$DRY_RUN" != "1" ] && [ "$YES" != "1" ]; then
 fi
 
 OS_ID="$(detect_os_id)"
+resolve_public_url_and_listen_addr
 LISTEN_PORT="$(listen_port "$LISTEN_ADDR")"
 step "Detected supported OS"
 echo "$OS_ID"
@@ -319,7 +389,8 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "Target user: ${TARGET_USER}"
   echo "Listen address: ${LISTEN_ADDR}"
   echo "Published port: ${LISTEN_PORT}"
-  echo "Public URL: ${PUBLIC_URL:-http://podorel.lan:8080}"
+  echo "Public URL: ${PUBLIC_URL}"
+  echo "Firewall: Fedora firewalld opens TCP ${LISTEN_PORT} automatically when running; otherwise allow it manually if blocked."
   require_command podman
   require_command install
   exit 0
@@ -352,6 +423,22 @@ if [ "$TARGET_HOME" = "" ]; then
   echo "Could not determine home directory for ${TARGET_USER}" >&2
   exit 1
 fi
+TARGET_UID="$(id -u "$TARGET_USER")"
+TARGET_GROUP="$(id -gn "$TARGET_USER")"
+TARGET_RUNTIME_DIR="/run/user/${TARGET_UID}"
+if [ "$TARGET_UID" = "0" ]; then
+  echo "Production deployment target must be a non-root user. Re-run as the target user with sudo available, or pass --target-user USER." >&2
+  exit 1
+fi
+
+run_as_target_user() {
+  sudo -H -u "$TARGET_USER" env \
+    HOME="$TARGET_HOME" \
+    USER="$TARGET_USER" \
+    LOGNAME="$TARGET_USER" \
+    XDG_RUNTIME_DIR="$TARGET_RUNTIME_DIR" \
+    "$@"
+}
 
 step "Installing OS packages"
 install_packages "$OS_ID"
@@ -363,61 +450,69 @@ require_command loginctl
 require_command sudo
 require_command sed
 
+
+step "Preparing target user home"
+install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.config" "${TARGET_HOME}/.local" "${TARGET_HOME}/.local/share"
+
 step "Installing binaries"
-install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_USER" "${TARGET_HOME}/.local/bin"
+install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local/bin"
 install -m 0755 bin/podorel /usr/local/bin/podorel
 install -m 0755 bin/podorel-agent "${TARGET_HOME}/.local/bin/podorel-agent"
-chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.local/bin/podorel-agent"
+chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.local/bin/podorel-agent"
 
 step "Creating persistent directories"
-install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_USER" "${TARGET_HOME}/.local/share/podorel" "${TARGET_HOME}/.local/share/podorel/logs" "${TARGET_HOME}/.config/podorel"
+install -d -m 0700 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.local/share/podorel" "${TARGET_HOME}/.local/share/podorel/logs" "${TARGET_HOME}/.config/podorel"
 if [ ! -f "${TARGET_HOME}/.config/podorel/agent-token" ]; then
   umask 077
   head -c 32 /dev/urandom | base64 > "${TARGET_HOME}/.config/podorel/agent-token"
-  chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/podorel/agent-token"
+  chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/podorel/agent-token"
 fi
 cat > "${TARGET_HOME}/.config/podorel/web.env" <<ENV
 PODOREL_ADMIN_PASSWORD=${ADMIN_PASSWORD}
 PODOREL_LISTEN_ADDR=${LISTEN_ADDR}
-PODOREL_PUBLIC_URL=${PUBLIC_URL:-http://podorel.lan:8080}
+PODOREL_PUBLIC_URL=${PUBLIC_URL}
 PODOREL_MODE=production
 PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock
 PODOREL_LOG_DIR=/app/data/logs
 ENV
 chmod 0600 "${TARGET_HOME}/.config/podorel/web.env"
-chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/podorel/web.env"
+chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/podorel/web.env"
 
 step "Enabling linger"
 loginctl enable-linger "$TARGET_USER"
 
 step "Installing systemd user units"
-install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_USER" "${TARGET_HOME}/.config/systemd/user"
+install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.config/systemd/user"
 install -m 0644 packaging/systemd/podorel-agent.service "${TARGET_HOME}/.config/systemd/user/podorel-agent.service"
 WEB_UNIT_TMP="$(mktemp)"
-sed "s/-p 8080:8080/-p ${LISTEN_PORT}:${LISTEN_PORT}/g" packaging/systemd/podorel-web.service > "$WEB_UNIT_TMP"
+sed "s/@PODOREL_WEB_PORT@/${LISTEN_PORT}/g" packaging/systemd/podorel-web.service > "$WEB_UNIT_TMP"
 install -m 0644 "$WEB_UNIT_TMP" "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
 rm -f "$WEB_UNIT_TMP"
-chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/systemd/user/podorel-agent.service" "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
+chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/systemd/user/podorel-agent.service" "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
 
 step "Building web image from prebuilt runtime files"
-sudo -u "$TARGET_USER" podman build -t podorel-web:latest -f packaging/podman/Containerfile.web-prebuilt .
+run_as_target_user podman build -t podorel-web:latest -f packaging/podman/Containerfile.web-prebuilt .
 
 step "Starting user services"
-sudo -u "$TARGET_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$TARGET_USER")" systemctl --user daemon-reload
-sudo -u "$TARGET_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$TARGET_USER")" systemctl --user enable --now podorel-agent.service
-sudo -u "$TARGET_USER" XDG_RUNTIME_DIR="/run/user/$(id -u "$TARGET_USER")" systemctl --user enable --now podorel-web.service
+run_as_target_user systemctl --user daemon-reload
+run_as_target_user systemctl --user enable --now podorel-agent.service
+run_as_target_user systemctl --user enable --now podorel-web.service
+
+step "Configuring host firewall"
+configure_fedora_firewall "$OS_ID" "$LISTEN_PORT"
 
 if [ "$GENERATED_PASSWORD" = "1" ]; then
   printf '%s\n' "$ADMIN_PASSWORD" > "${TARGET_HOME}/.config/podorel/generated-admin-password"
   chmod 0600 "${TARGET_HOME}/.config/podorel/generated-admin-password"
-  chown "$TARGET_USER:$TARGET_USER" "${TARGET_HOME}/.config/podorel/generated-admin-password"
+  chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/podorel/generated-admin-password"
   step "Generated admin password"
   echo "Saved to ${TARGET_HOME}/.config/podorel/generated-admin-password"
   echo "$ADMIN_PASSWORD"
 fi
 
 step "Install complete"
-echo "PoDorel: ${PUBLIC_URL:-http://podorel.lan:8080}"
+echo "PoDorel: ${PUBLIC_URL}"
+echo "Firewall: Fedora firewalld opens TCP ${LISTEN_PORT} automatically when running; otherwise allow it manually if blocked."
 echo "Services: systemctl --user status podorel-web.service podorel-agent.service"
 INSTALL_SH
 

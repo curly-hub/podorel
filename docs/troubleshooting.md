@@ -21,6 +21,34 @@ Development URLs are `http://localhost:4200` for the Angular UI and
 successful login session. The default development admin login is `admin` with
 `podorel-development-password`.
 
+## Cannot Reach Production URL From Another Machine
+
+If `curl -I http://127.0.0.1:PORT/` works on the host but another machine cannot
+reach `http://HOST:PORT/`, first confirm the Podman publisher is listening on all
+host interfaces:
+
+```bash
+ss -ltnp | grep ':PORT'
+```
+
+The listener should show `*:PORT` or `0.0.0.0:PORT`. If it does, PoDorel is up
+and the remaining issue is usually the host firewall, the wrong LAN IP, mDNS, or
+network isolation. Fedora installs open the chosen port in firewalld when it is
+running unless `PODOREL_SKIP_FIREWALL=1` is set. For other firewalls, allow the
+chosen port manually, then test the LAN IP directly before testing `.local` DNS.
+
+```bash
+sudo ufw allow PORT/tcp
+curl -I http://LAN-IP:PORT/
+```
+
+On Fedora or other firewalld-based systems, use `firewall-cmd` instead of `ufw`:
+
+```bash
+sudo firewall-cmd --permanent --add-port=PORT/tcp
+sudo firewall-cmd --reload
+```
+
 ## Session Or CSRF Errors
 
 The UI refreshes its state-changing request token from `/api/auth/me` when it

@@ -874,6 +874,14 @@ func (failingRefreshAgentClient) CreateSecret(ctx context.Context, req agents.Cr
 	return errors.New("agent offline")
 }
 
+func (failingRefreshAgentClient) ScannerStatus(ctx context.Context, scanner string) (agents.ScannerStatus, error) {
+	return agents.ScannerStatus{}, errors.New("agent offline")
+}
+
+func (failingRefreshAgentClient) ScanImage(ctx context.Context, req agents.ScanImageRequest) (agents.ScanImageResult, error) {
+	return agents.ScanImageResult{}, errors.New("agent offline")
+}
+
 type statsInferenceAgentClient struct {
 	fakeAgentClient
 	stats []agents.ContainerStats
@@ -956,6 +964,14 @@ func (f *fakeAgentClient) BuildImage(ctx context.Context, req agents.BuildImageR
 func (f *fakeAgentClient) CreateSecret(ctx context.Context, req agents.CreateSecretRequest) error {
 	f.secrets = append(f.secrets, req.Name)
 	return nil
+}
+
+func (f *fakeAgentClient) ScannerStatus(ctx context.Context, scanner string) (agents.ScannerStatus, error) {
+	return agents.ScannerStatus{Scanner: scanner, Available: false, Error: scannerUnavailableMessage(scanner)}, nil
+}
+
+func (f *fakeAgentClient) ScanImage(ctx context.Context, req agents.ScanImageRequest) (agents.ScanImageResult, error) {
+	return agents.ScanImageResult{}, errors.New("scanner unavailable")
 }
 
 func TestDevSupervisorStatusMissingFileIsFriendly(t *testing.T) {

@@ -80,6 +80,91 @@ podorel_require_go_version_for_module() {
   echo "Go toolchain: go${active} (module requires go ${required})"
 }
 
+podorel_listen_port() {
+  local addr="$1"
+  local port="${addr##*:}"
+  if [[ ! "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+    echo "Could not determine listen port from ${addr}" >&2
+    return 1
+  fi
+  echo "$port"
+}
+
+podorel_public_url_explicit_port() {
+  local url="$1"
+  local rest="$url"
+  if [[ "$rest" == *"://"* ]]; then
+    rest="${rest#*://}"
+  fi
+  local authority="${rest%%/*}"
+  authority="${authority##*@}"
+  if [[ "$authority" == \[*\]* ]]; then
+    local after_bracket="${authority#*]}"
+    if [[ "$after_bracket" =~ ^:([0-9]+)$ ]]; then
+      echo "${BASH_REMATCH[1]}"
+    fi
+    return 0
+  fi
+  if [[ "$authority" =~ :([0-9]+)$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+  fi
+}
+
+podorel_resolve_public_url_and_listen_addr() {
+  local public_url_var="$1"
+  local listen_addr_var="$2"
+  local public_url="${!public_url_var}"
+  local listen_addr="${!listen_addr_var}"
+  local public_port=""
+  if [ "$public_url" != "" ]; then
+    public_port="$(podorel_public_url_explicit_port "$public_url")"
+  fi
+  if [ "$listen_addr" = "" ]; then
+    if [ "$public_port" != "" ]; then
+      listen_addr="0.0.0.0:${public_port}"
+    else
+      listen_addr="0.0.0.0:8080"
+    fi
+  fi
+  local listen_port
+  listen_port="$(podorel_listen_port "$listen_addr")"
+  if [ "$public_url" = "" ]; then
+    public_url="http://podorel.lan:${listen_port}"
+  fi
+  printf -v "$public_url_var" '%s' "$public_url"
+  printf -v "$listen_addr_var" '%s' "$listen_addr"
+}
+
+podorel_configure_fedora_firewall() {
+  local os_id="$1"
+  local listen_port="$2"
+  if [ "$os_id" != "fedora" ]; then
+    return 0
+  fi
+  if [ "${PODOREL_SKIP_FIREWALL:-}" = "1" ]; then
+    echo "Skipping Fedora firewalld configuration because PODOREL_SKIP_FIREWALL=1."
+    return 0
+  fi
+  if ! command -v firewall-cmd >/dev/null 2>&1; then
+    echo "firewall-cmd is not installed; allow inbound TCP ${listen_port} manually if this host blocks LAN access."
+    return 0
+  fi
+  if ! firewall-cmd --state >/dev/null 2>&1; then
+    echo "firewalld is not running; allow inbound TCP ${listen_port} manually if another firewall blocks LAN access."
+    return 0
+  fi
+  if firewall-cmd --permanent --query-port="${listen_port}/tcp" >/dev/null 2>&1; then
+    if ! firewall-cmd --query-port="${listen_port}/tcp" >/dev/null 2>&1; then
+      firewall-cmd --reload
+    fi
+    echo "Fedora firewalld already allows TCP ${listen_port}."
+    return 0
+  fi
+  firewall-cmd --permanent --add-port="${listen_port}/tcp"
+  firewall-cmd --reload
+  echo "Fedora firewalld now allows TCP ${listen_port}."
+}
+
 podorel_detect_os_id() {
   if [ ! -r /etc/os-release ]; then
     echo "$PODOREL_UNSUPPORTED_DISTRO_MESSAGE" >&2

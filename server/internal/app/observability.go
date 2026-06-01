@@ -401,11 +401,11 @@ func (a *App) handleSecuritySummary(w http.ResponseWriter, r *http.Request, _ db
 	digests, _ := a.store.ListImageDigests(r.Context(), 20)
 	updates, _ := a.store.ListHostPackageUpdates(r.Context(), 20)
 	scanner := a.configuredScannerName()
-	scannerAvailable := true
+	scannerStatus := a.securityScannerStatus(r.Context(), db.PrimaryAgentID, scanner)
+	scannerAvailable := scannerStatus.Available
 	scannerError := ""
-	if _, err := lookupSecurityScanner(scanner); err != nil {
-		scannerAvailable = false
-		scannerError = scannerUnavailableMessage(scanner)
+	if !scannerAvailable {
+		scannerError = firstNonEmpty(scannerStatus.Error, scannerUnavailableMessage(scanner))
 	}
 	api.WriteOK(r.Context(), w, map[string]any{
 		"status":            status,

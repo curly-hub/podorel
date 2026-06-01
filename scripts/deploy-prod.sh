@@ -64,6 +64,10 @@ fi
 TARGET_UID="$(id -u "$TARGET_USER")"
 TARGET_GROUP="$(id -gn "$TARGET_USER")"
 TARGET_RUNTIME_DIR="/run/user/${TARGET_UID}"
+PUBLIC_URL="${PODOREL_PUBLIC_URL:-}"
+LISTEN_ADDR="${PODOREL_LISTEN_ADDR:-}"
+podorel_resolve_public_url_and_listen_addr PUBLIC_URL LISTEN_ADDR
+LISTEN_PORT="$(podorel_listen_port "$LISTEN_ADDR")"
 if [ "$TARGET_UID" = "0" ]; then
   echo "Production deployment target must be a non-root user. Re-run as the target user with sudo available, or pass --target-user USER." >&2
   exit 1
@@ -87,6 +91,10 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "Target user: ${TARGET_USER}"
   echo "Target home: ${TARGET_HOME}"
   echo "Target runtime: ${TARGET_RUNTIME_DIR}"
+  echo "Listen address: ${LISTEN_ADDR}"
+  echo "Published port: ${LISTEN_PORT}"
+  echo "Public URL: ${PUBLIC_URL}"
+  echo "Firewall: Fedora firewalld opens TCP ${LISTEN_PORT} automatically when running; otherwise allow it manually if blocked."
   podorel_step "Dry run complete"
   exit 0
 fi
@@ -106,7 +114,7 @@ case "$OS_ID" in
     fi
     ;;
   fedora)
-    dnf install -y git golang podman shadow-utils slirp4netns fuse-overlayfs sqlite
+    dnf install -y git golang podman shadow-utils slirp4netns fuse-overlayfs sqlite firewalld
     if ! command -v trivy >/dev/null 2>&1; then
       echo "Trivy is not available from the current package metadata; install Trivy before production security scans." >&2
     fi
@@ -119,6 +127,7 @@ podorel_require_command go
 podorel_require_go_version_for_module go.mod
 podorel_require_command install
 podorel_require_command loginctl
+
 
 podorel_step "Building binaries"
 go build -o ./bin/podorel ./cmd/podorel
@@ -142,8 +151,8 @@ if [ ! -f "${TARGET_HOME}/.config/podorel/agent-token" ]; then
 fi
 cat > "${TARGET_HOME}/.config/podorel/web.env" <<ENV
 PODOREL_ADMIN_PASSWORD=${PODOREL_ADMIN_PASSWORD}
-PODOREL_LISTEN_ADDR=${PODOREL_LISTEN_ADDR:-0.0.0.0:8080}
-PODOREL_PUBLIC_URL=${PODOREL_PUBLIC_URL:-http://podorel.lan:8080}
+PODOREL_LISTEN_ADDR=${LISTEN_ADDR}
+PODOREL_PUBLIC_URL=${PUBLIC_URL}
 PODOREL_MODE=production
 PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock
 PODOREL_LOG_DIR=/app/data/logs
@@ -157,7 +166,10 @@ loginctl enable-linger "$TARGET_USER"
 podorel_step "Installing systemd user units"
 install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_GROUP" "${TARGET_HOME}/.config/systemd/user"
 install -m 0644 packaging/systemd/podorel-agent.service "${TARGET_HOME}/.config/systemd/user/podorel-agent.service"
-install -m 0644 packaging/systemd/podorel-web.service "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
+WEB_UNIT_TMP="$(mktemp)"
+sed "s/@PODOREL_WEB_PORT@/${LISTEN_PORT}/g" packaging/systemd/podorel-web.service > "$WEB_UNIT_TMP"
+install -m 0644 "$WEB_UNIT_TMP" "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
+rm -f "$WEB_UNIT_TMP"
 chown "$TARGET_USER:$TARGET_GROUP" "${TARGET_HOME}/.config/systemd/user/podorel-agent.service" "${TARGET_HOME}/.config/systemd/user/podorel-web.service"
 
 podorel_step "Building web image"
@@ -168,6 +180,10 @@ run_as_target_user systemctl --user daemon-reload
 run_as_target_user systemctl --user enable --now podorel-agent.service
 run_as_target_user systemctl --user enable --now podorel-web.service
 
+podorel_step "Configuring host firewall"
+podorel_configure_fedora_firewall "$OS_ID" "$LISTEN_PORT"
+
 podorel_step "Final URL"
-echo "PoDorel: ${PODOREL_PUBLIC_URL:-http://podorel.lan:8080}"
+echo "PoDorel: ${PUBLIC_URL}"
+echo "Firewall: Fedora firewalld opens TCP ${LISTEN_PORT} automatically when running; otherwise allow it manually if blocked."
 echo "Recovery: systemctl --user status podorel-web.service podorel-agent.service"

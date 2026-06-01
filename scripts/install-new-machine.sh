@@ -122,7 +122,13 @@ if [ "$GENERATED_PASSWORD" = "1" ]; then
   echo "$ADMIN_PASSWORD"
 fi
 
+FINAL_PUBLIC_URL="${PODOREL_PUBLIC_URL:-}"
+FINAL_LISTEN_ADDR="${PODOREL_LISTEN_ADDR:-}"
+podorel_resolve_public_url_and_listen_addr FINAL_PUBLIC_URL FINAL_LISTEN_ADDR
+FINAL_LISTEN_PORT="$(podorel_listen_port "$FINAL_LISTEN_ADDR")"
+
 podorel_step "Install complete"
-echo "PoDorel: ${PODOREL_PUBLIC_URL:-http://podorel.lan:8080}"
+echo "PoDorel: ${FINAL_PUBLIC_URL}"
+echo "Firewall: Fedora firewalld opens TCP ${FINAL_LISTEN_PORT} automatically when running; otherwise allow it manually if blocked."
 echo "Web pod: podman pod ps --filter name=podorel"
 echo "Services: systemctl --user status podorel-web.service podorel-agent.service"

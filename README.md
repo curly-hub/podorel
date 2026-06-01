@@ -32,6 +32,12 @@ cd podorel
 ./install.sh --yes --public-url http://podorel.lan:8080
 ```
 
+If the public URL includes an explicit port, such as
+`http://curly-hub.local:9095`, the installer publishes and listens on that port
+unless `--listen-addr` is also supplied. On Fedora with firewalld running, the
+installer also opens that TCP port; set `PODOREL_SKIP_FIREWALL=1` to skip it.
+Other firewalls may still need a manual allow rule.
+
 Check the installation plan without changing the machine:
 
 ```bash

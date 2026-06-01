@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/curly-hub/podorel/server/internal/agents"
 	"github.com/curly-hub/podorel/server/internal/api"
 	"github.com/curly-hub/podorel/server/internal/db"
 	"github.com/curly-hub/podorel/server/internal/security"
@@ -20,7 +21,7 @@ import (
 func (a *App) runSecurityScan(ctx context.Context, agentID string) (db.SecurityScan, error) {
 	started := a.now()
 	scanner := a.configuredScannerName()
-	scannerPath, err := lookupSecurityScanner(scanner)
+	scannerStatus, scannerClient, err := a.securityScannerForScan(ctx, agentID, scanner)
 	if err != nil {
 		if a.allowSnapshotFallback {
 			return a.securityScanFromFixture(ctx, agentID, scanner, started)
@@ -47,22 +48,19 @@ func (a *App) runSecurityScan(ctx context.Context, agentID string) (db.SecurityS
 			FinishedAt:     a.now(),
 			Summary:        summary,
 			ErrorCode:      "SCANNER_UNAVAILABLE",
-			ErrorMessage:   scannerUnavailableMessage(scanner),
+			ErrorMessage:   firstNonEmpty(scannerStatus.Error, err.Error(), scannerUnavailableMessage(scanner)),
 		})
 	}
 	images, err := a.containerImages(ctx, agentID)
 	if err != nil {
 		return db.SecurityScan{}, err
 	}
-	version := commandFirstLine(ctx, scannerPath, "--version")
-	if version == "" {
-		version = "unknown"
-	}
+	version := firstNonEmpty(scannerStatus.Version, "unknown")
 	summary := emptySecuritySummary("trivy")
 	findings := []db.SecurityFinding{}
 	var scanErr error
 	for _, image := range images {
-		raw, err := commandOutput(ctx, scannerPath, "image", "--format", "json", "--quiet", image)
+		raw, err := a.runScannerForImage(ctx, scannerClient, scanner, scannerStatus.Path, image)
 		if err != nil {
 			scanErr = errors.Join(scanErr, fmt.Errorf("%s: %w", image, err))
 			continue
@@ -169,6 +167,40 @@ func (a *App) securityScanFromFixture(ctx context.Context, agentID string, scann
 	return scan, a.store.InsertSecurityFindings(ctx, findings)
 }
 
+func (a *App) securityScannerForScan(ctx context.Context, agentID string, scanner string) (agents.ScannerStatus, AgentClient, error) {
+	if _, client, ok, err := a.agentClient(ctx, agentID); err == nil && ok {
+		status, err := client.ScannerStatus(ctx, scanner)
+		if err != nil {
+			return agents.ScannerStatus{Scanner: scanner, Available: false, Error: err.Error()}, client, err
+		}
+		if !status.Available {
+			message := firstNonEmpty(status.Error, scannerUnavailableMessage(scanner))
+			return status, client, errors.New(message)
+		}
+		return status, client, nil
+	}
+	path, err := lookupSecurityScanner(scanner)
+	if err != nil {
+		return agents.ScannerStatus{Scanner: scanner, Available: false, Error: scannerUnavailableMessage(scanner)}, nil, err
+	}
+	version := commandFirstLine(ctx, path, "--version")
+	if version == "" {
+		version = "unknown"
+	}
+	return agents.ScannerStatus{Scanner: scanner, Available: true, Path: path, Version: version}, nil, nil
+}
+
+func (a *App) runScannerForImage(ctx context.Context, client AgentClient, scanner string, localScannerPath string, image string) ([]byte, error) {
+	if client != nil {
+		result, err := client.ScanImage(ctx, agents.ScanImageRequest{Scanner: scanner, Image: image})
+		if err != nil {
+			return nil, err
+		}
+		return []byte(result.RawJSON), nil
+	}
+	return commandOutput(ctx, localScannerPath, "image", "--format", "json", "--quiet", image)
+}
+
 func (a *App) containerImages(ctx context.Context, agentID string) ([]string, error) {
 	containers, err := a.store.ListContainers(ctx, "", agentID)
 	if err != nil {
@@ -258,22 +290,27 @@ type scannerInstallOption struct {
 
 func (a *App) handleScannerOptions(w http.ResponseWriter, r *http.Request, _ db.Session) {
 	scanner := a.configuredScannerName()
-	scannerPath, err := lookupSecurityScanner(scanner)
+	status := a.securityScannerStatus(r.Context(), db.PrimaryAgentID, scanner)
 	response := scannerOptionsResponse{
 		Scanner:          scanner,
-		ScannerAvailable: err == nil,
-		ScannerPath:      scannerPath,
+		ScannerAvailable: status.Available,
+		ScannerPath:      status.Path,
+		ScannerVersion:   status.Version,
 		Options:          scannerInstallOptions(scanner),
 	}
-	if err != nil {
-		response.ScannerError = scannerUnavailableMessage(scanner)
-	} else {
-		response.ScannerVersion = commandFirstLine(r.Context(), scannerPath, "--version")
-		if response.ScannerVersion == "" {
-			response.ScannerVersion = "unknown"
-		}
+	if !status.Available {
+		response.ScannerError = firstNonEmpty(status.Error, scannerUnavailableMessage(scanner))
 	}
 	api.WriteOK(r.Context(), w, response)
+}
+
+func (a *App) securityScannerStatus(ctx context.Context, agentID string, scanner string) agents.ScannerStatus {
+	status, _, err := a.securityScannerForScan(ctx, agentID, scanner)
+	if err != nil {
+		status.Available = false
+		status.Error = firstNonEmpty(status.Error, err.Error(), scannerUnavailableMessage(scanner))
+	}
+	return status
 }
 
 func (a *App) configuredScannerName() string {
@@ -368,7 +405,7 @@ func lookupSecurityScanner(scanner string) (string, error) {
 }
 
 func scannerUnavailableMessage(scanner string) string {
-	return fmt.Sprintf("%s is not installed or not on PATH. Install Trivy, or set Security scanner to an executable path in Settings.", scanner)
+	return fmt.Sprintf("%s is not installed or not on the host agent PATH. Install Trivy on the host, or set Security scanner to an executable path in Settings.", scanner)
 }
 
 func emptySecuritySummary(source string) map[string]any {

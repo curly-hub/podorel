@@ -9,6 +9,12 @@ common local operations.
 ./install.sh --yes --public-url http://podorel.lan:8080
 ```
 
+If the public URL includes an explicit port, such as
+`http://curly-hub.local:9095`, the installer publishes and listens on that port
+unless `--listen-addr` is also supplied. On Fedora with firewalld running, the
+installer also opens that TCP port; set `PODOREL_SKIP_FIREWALL=1` to skip it.
+Other firewalls may still need a manual allow rule.
+
 Run the installer as the Linux user that should own rootless Podman. The script
 will ask for sudo when it needs system-level changes. If you are already in a
 root shell, pass `--target-user USER` so production services are not installed

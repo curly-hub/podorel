@@ -127,6 +127,8 @@ func (s Server) routes() http.Handler {
 	mux.HandleFunc("POST /compose-stacks/deploy", s.withRuntime(s.handleDeployComposeStack))
 	mux.HandleFunc("POST /images/build-from-dockerfile", s.withRuntime(s.handleBuildImage))
 	mux.HandleFunc("POST /secrets", s.withRuntime(s.handleCreateSecret))
+	mux.HandleFunc("GET /security/scanner", s.handleScannerStatus)
+	mux.HandleFunc("POST /security/scan-image", s.handleScanImage)
 	return mux
 }
 

@@ -35,7 +35,7 @@ interface ScannerSafety {
 export class SecurityUpdatesPageComponent implements OnInit {
   readonly helpTopics = {
     page: 'Security combines vulnerability scan results, image digest checks, and host package update checks.',
-    scanner: 'The vulnerability scanner executable. PoDorel currently expects Trivy unless Settings points to another compatible scanner path.',
+    scanner: 'The vulnerability scanner executable on the host agent. PoDorel currently expects Trivy unless Settings points to another compatible scanner path.',
     lastScan: 'When the latest scan finished. Empty means no successful scan has been recorded yet.',
     digest: 'Compares locally used image digests with registry data to flag images that may have newer upstream content.',
     hostPackages: 'Checks Podman-related host packages through apt or dnf when available.',
@@ -109,7 +109,7 @@ sudo dnf -y install trivy`,
     {
       id: 'custom-scanner-path',
       title: 'Use an existing scanner path',
-      description: 'If Trivy is installed somewhere custom, set Security scanner in Settings to the executable path.',
+      description: 'If Trivy is installed somewhere custom on the host agent, set Security scanner in Settings to the executable path.',
       command: '/path/to/trivy --version',
       available: false,
       requires_sudo: false,
@@ -226,7 +226,7 @@ sudo dnf -y install trivy`,
       }
       return `${options.scanner} ${version} detected at ${options.scanner_path || 'PATH'}`;
     }
-    return this.scannerNotice() || `Install ${options?.scanner || this.summary()?.scanner || 'trivy'} on the host running PoDorel.`;
+    return this.scannerNotice() || `Install ${options?.scanner || this.summary()?.scanner || 'trivy'} on the host running the PoDorel agent.`;
   }
 
   statusIcon(): string {
@@ -308,7 +308,7 @@ sudo dnf -y install trivy`,
 
   scannerVersionSafety(): ScannerSafety {
     if (this.scannerUnavailable()) {
-      return { status: 'unavailable', label: 'Scanner unavailable', detail: 'Install Trivy before PoDorel can verify the scanner version.' };
+      return { status: 'unavailable', label: 'Scanner unavailable', detail: 'Install Trivy on the host agent before PoDorel can verify the scanner version.' };
     }
     const version = this.parsedScannerVersion();
     if (!version) {

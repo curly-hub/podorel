@@ -6,7 +6,7 @@ and tested, but these areas are still evolving.
 Known limits:
 
 1. Production support is intended for Debian, Ubuntu, and Fedora, but full distro-matrix CI validation is still pending.
-2. Security scans run Trivy when it is installed and record scanner-unavailable failures otherwise. Image remote digest checks require `skopeo` when available, and host package checks are best-effort through `apt` or `dnf`.
+2. Security scans run Trivy through the host agent when it is installed on that host and record scanner-unavailable failures otherwise. Image remote digest checks require `skopeo` when available, and host package checks are best-effort through `apt` or `dnf`.
 3. Dockerfile imports create durable `image_builds` records and expose a build-status WebSocket by `build_id`, but full line-by-line Podman build output streaming and multi-file build-context archives are still incomplete.
 4. Docker Compose stacks can be cataloged, previewed, bundled, and deployed through the agent with `podman compose` or `podman-compose`; editing compose files and `.env` values directly in the UI is still incomplete.
 5. Pod creation supports validated template values and proxies creation through the agent, but template value schemas are not yet first-class metadata in template files.

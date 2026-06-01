@@ -67,7 +67,7 @@
           @if (scannerReady()) {
             Scanner path is configured and reachable.
           } @else {
-            Install Trivy on the host running PoDorel, then refresh this page.
+            Install Trivy on the host running the PoDorel agent, then refresh this page.
           }
         </mat-card-subtitle>
       </mat-card-header>
@@ -117,7 +117,7 @@
         @if (scannerOptions()?.scanner_available) {
           {{ scannerOptions()?.scanner }} {{ scannerVersionLabel() }} is available at {{ scannerOptions()?.scanner_path }}
         } @else {
-          {{ scannerOptions()?.scanner || 'trivy' }} is not available to the web process
+          {{ scannerOptions()?.scanner || 'trivy' }} is not available to the host agent
         }
       </mat-card-subtitle>
     </mat-card-header>

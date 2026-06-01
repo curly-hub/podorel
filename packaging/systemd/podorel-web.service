@@ -7,13 +7,12 @@ Wants=podorel-agent.service
 Type=notify
 NotifyAccess=all
 ExecStartPre=-/usr/bin/podman pod rm -f podorel
-ExecStartPre=/usr/bin/podman pod create --name podorel --label io.podorel.self=true -p 8080:8080
+ExecStartPre=/usr/bin/podman pod create --name podorel --label io.podorel.self=true -p 0.0.0.0:@PODOREL_WEB_PORT@:@PODOREL_WEB_PORT@
 ExecStart=/usr/bin/podman run --rm --name podorel-web --pod podorel --sdnotify=container --security-opt label=disable --env-file %h/.config/podorel/web.env -e PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock -e PODOREL_AGENT_TOKEN_FILE=/run/secrets/podorel-agent-token -e PODOREL_LOG_DIR=/app/data/logs -v %h/.local/share/podorel:/app/data:Z -v %h/.config/podorel/agent-token:/run/secrets/podorel-agent-token:ro,Z -v %t/podorel:/run/podorel-agent:ro podorel-web:latest podorel-web --production --db-path /app/data/podorel.db --ui-dist-path /app/ui
 ExecStop=-/usr/bin/podman stop podorel-web
 ExecStopPost=-/usr/bin/podman pod rm -f podorel
 Restart=always
 RestartSec=2s
-WatchdogSec=30s
 
 [Install]
 WantedBy=default.target

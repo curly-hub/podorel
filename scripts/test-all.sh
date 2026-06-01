@@ -102,14 +102,49 @@ if [[ "$AGENT_UNIT" != *"Type=notify"* || "$AGENT_UNIT" != *"WatchdogSec=30s"* ]
   echo "Agent systemd unit must use Type=notify with WatchdogSec=30s." >&2
   exit 1
 fi
-if [[ "$WEB_UNIT" != *"Type=notify"* || "$WEB_UNIT" != *"--sdnotify=container"* || "$WEB_UNIT" != *"WatchdogSec=30s"* || "$WEB_UNIT" != *"pod create --name podorel"* || "$WEB_UNIT" != *"--pod podorel"* || "$WEB_UNIT" != *"PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock"* || "$WEB_UNIT" != *"%t/podorel:/run/podorel-agent:ro"* ]]; then
-  echo "Web systemd unit must use Type=notify, --sdnotify=container, WatchdogSec=30s, run inside the podorel Podman pod, and mount the host agent socket." >&2
+if [[ "$WEB_UNIT" != *"Type=notify"* || "$WEB_UNIT" != *"--sdnotify=container"* || "$WEB_UNIT" != *"pod create --name podorel"* || "$WEB_UNIT" != *"--pod podorel"* || "$WEB_UNIT" != *"PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock"* || "$WEB_UNIT" != *"%t/podorel:/run/podorel-agent:ro"* ]]; then
+  echo "Web systemd unit must use Type=notify, --sdnotify=container, run inside the podorel Podman pod, and mount the host agent socket." >&2
+  exit 1
+fi
+if [[ "$WEB_UNIT" == *"WatchdogSec="* ]]; then
+  echo "Web systemd unit must not use WatchdogSec because systemd can abort Podman/conmon instead of the containerized web process." >&2
+  exit 1
+fi
+if [[ "$WEB_UNIT" != *"-p 0.0.0.0:@PODOREL_WEB_PORT@:@PODOREL_WEB_PORT@"* ]]; then
+  echo "Web systemd unit must publish the installer-substituted port on all host interfaces." >&2
+  exit 1
+fi
+
+podorel_step "Checking Fedora firewall installer support"
+COMMON_LIB="$(<scripts/lib/common.sh)"
+DEPLOY_PROD_SCRIPT="$(<scripts/deploy-prod.sh)"
+BUILD_DEPLOY_SCRIPT="$(<scripts/build-deploy.sh)"
+if [[ "$COMMON_LIB" != *"podorel_configure_fedora_firewall"* || "$COMMON_LIB" != *"firewall-cmd --permanent --add-port"* || "$COMMON_LIB" != *"PODOREL_SKIP_FIREWALL"* ]]; then
+  echo "Shared installer helpers must support opt-out Fedora firewalld port configuration." >&2
+  exit 1
+fi
+if [[ "$DEPLOY_PROD_SCRIPT" != *"sqlite firewalld"* || "$DEPLOY_PROD_SCRIPT" != *'podorel_configure_fedora_firewall "$OS_ID" "$LISTEN_PORT"'* ]]; then
+  echo "Production installer must install firewalld on Fedora and configure the selected TCP port." >&2
+  exit 1
+fi
+if [[ "$BUILD_DEPLOY_SCRIPT" != *"sqlite firewalld"* || "$BUILD_DEPLOY_SCRIPT" != *"configure_fedora_firewall"* || "$BUILD_DEPLOY_SCRIPT" != *"PODOREL_SKIP_FIREWALL"* ]]; then
+  echo "Generated deploy bundle installer must include Fedora firewalld port configuration." >&2
   exit 1
 fi
 
 podorel_step "Running installer dry-run checks"
 PODOREL_ADMIN_PASSWORD="test-password-for-dry-run" scripts/deploy-prod.sh --dry-run
+PROD_PORT_DRY_RUN_OUTPUT="$(PODOREL_ADMIN_PASSWORD="test-password-for-dry-run" PODOREL_PUBLIC_URL="http://curly-hub.local:9095" scripts/deploy-prod.sh --dry-run)"
+if [[ "$PROD_PORT_DRY_RUN_OUTPUT" != *"Listen address: 0.0.0.0:9095"* || "$PROD_PORT_DRY_RUN_OUTPUT" != *"Published port: 9095"* || "$PROD_PORT_DRY_RUN_OUTPUT" != *"Public URL: http://curly-hub.local:9095"* ]]; then
+  echo "Production dry-run must derive the listen/published port from an explicit public URL port." >&2
+  exit 1
+fi
 PODOREL_ADMIN_PASSWORD="test-password-for-dry-run" scripts/install-new-machine.sh --dry-run
+NEW_MACHINE_PORT_DRY_RUN_OUTPUT="$(PODOREL_ADMIN_PASSWORD="test-password-for-dry-run" PODOREL_PUBLIC_URL="http://curly-hub.local:9095" scripts/install-new-machine.sh --dry-run)"
+if [[ "$NEW_MACHINE_PORT_DRY_RUN_OUTPUT" != *"Listen address: 0.0.0.0:9095"* || "$NEW_MACHINE_PORT_DRY_RUN_OUTPUT" != *"Published port: 9095"* ]]; then
+  echo "New-machine dry-run must pass explicit public URL ports through to deploy-prod." >&2
+  exit 1
+fi
 ./install.sh --dry-run --yes
 scripts/build-deploy.sh --dry-run --target /tmp/podorel-deploy-dry-run --name podorel-dry-run
 scripts/git-export.sh --dry-run

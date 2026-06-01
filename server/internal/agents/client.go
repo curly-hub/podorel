@@ -16,7 +16,7 @@ import (
 	ws "github.com/curly-hub/podorel/internal/websocket"
 )
 
-const defaultAgentClientTimeout = 10 * time.Second
+const defaultAgentClientTimeout = 5 * time.Minute
 
 type Client struct {
 	socketPath string
@@ -131,6 +131,27 @@ type BuildImageRequest struct {
 type CreateSecretRequest struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+type ScannerStatus struct {
+	Scanner   string `json:"scanner"`
+	Available bool   `json:"available"`
+	Path      string `json:"path"`
+	Version   string `json:"version"`
+	Error     string `json:"error"`
+}
+
+type ScanImageRequest struct {
+	Scanner string `json:"scanner"`
+	Image   string `json:"image"`
+}
+
+type ScanImageResult struct {
+	Scanner        string `json:"scanner"`
+	ScannerPath    string `json:"scanner_path"`
+	ScannerVersion string `json:"scanner_version"`
+	Image          string `json:"image"`
+	RawJSON        string `json:"raw_json"`
 }
 
 func NewClient(socketPath string, token string) *Client {
@@ -261,6 +282,26 @@ func (c *Client) BuildImage(ctx context.Context, req BuildImageRequest) error {
 func (c *Client) CreateSecret(ctx context.Context, req CreateSecretRequest) error {
 	var result map[string]any
 	return c.doEnvelope(ctx, http.MethodPost, "/secrets", req, &result)
+}
+
+func (c *Client) ScannerStatus(ctx context.Context, scanner string) (ScannerStatus, error) {
+	query := url.Values{}
+	if strings.TrimSpace(scanner) != "" {
+		query.Set("scanner", scanner)
+	}
+	path := "/security/scanner"
+	if encoded := query.Encode(); encoded != "" {
+		path += "?" + encoded
+	}
+	var status ScannerStatus
+	err := c.doEnvelope(ctx, http.MethodGet, path, nil, &status)
+	return status, err
+}
+
+func (c *Client) ScanImage(ctx context.Context, req ScanImageRequest) (ScanImageResult, error) {
+	var result ScanImageResult
+	err := c.doEnvelope(ctx, http.MethodPost, "/security/scan-image", req, &result)
+	return result, err
 }
 
 func (c *Client) doEnvelope(ctx context.Context, method string, path string, body any, out any) error {

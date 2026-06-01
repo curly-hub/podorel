@@ -369,6 +369,14 @@ func (f *fakeAgent) CreateSecret(ctx context.Context, req agents.CreateSecretReq
 	return nil
 }
 
+func (f *fakeAgent) ScannerStatus(ctx context.Context, scanner string) (agents.ScannerStatus, error) {
+	return agents.ScannerStatus{Scanner: scanner, Available: false, Error: scanner + " is not available in the fake agent"}, nil
+}
+
+func (f *fakeAgent) ScanImage(ctx context.Context, req agents.ScanImageRequest) (agents.ScanImageResult, error) {
+	return agents.ScanImageResult{}, errors.New("scanner unavailable")
+}
+
 func writeRealE2ETemplate(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

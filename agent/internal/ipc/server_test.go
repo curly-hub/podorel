@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,6 +17,16 @@ import (
 )
 
 func TestServerHealthRequiresToken(t *testing.T) {
+	binDir := filepath.Join(t.TempDir(), "bin")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	fakeTrivy := filepath.Join(binDir, "trivy")
+	if err := os.WriteFile(fakeTrivy, []byte("#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'Version: 0.50.0'; exit 0; fi\nif [ \"$1\" = \"image\" ]; then printf '{\"Results\":[]}'; exit 0; fi\necho unsupported >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+
 	socket := filepath.Join(t.TempDir(), "agent.sock")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -111,6 +122,55 @@ func TestServerHealthRequiresToken(t *testing.T) {
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("create pod status = %d", resp.StatusCode)
+	}
+
+	req, err = http.NewRequest(http.MethodGet, "http://podorel-agent/security/scanner?scanner=trivy", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer secret-token")
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var scannerPayload struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Available bool   `json:"available"`
+			Path      string `json:"path"`
+			Version   string `json:"version"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&scannerPayload); err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if !scannerPayload.OK || !scannerPayload.Data.Available || scannerPayload.Data.Path != fakeTrivy || !strings.Contains(scannerPayload.Data.Version, "0.50.0") {
+		t.Fatalf("scanner payload = %#v", scannerPayload)
+	}
+
+	req, err = http.NewRequest(http.MethodPost, "http://podorel-agent/security/scan-image", bytes.NewBufferString(`{"scanner":"trivy","image":"alpine:3.20"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer secret-token")
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var scanPayload struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Image   string `json:"image"`
+			RawJSON string `json:"raw_json"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&scanPayload); err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if !scanPayload.OK || scanPayload.Data.Image != "alpine:3.20" || !strings.Contains(scanPayload.Data.RawJSON, "Results") {
+		t.Fatalf("scan payload = %#v", scanPayload)
 	}
 
 	cancel()
