@@ -76,12 +76,6 @@ export function formatCpuPercent(value: number): string {
 }
 
 export function formatMemoryDisplay(aggregate: StatsAggregate): string {
-  if (aggregate.singleMemoryRaw) {
-    return aggregate.singleMemoryRaw;
-  }
-  if (aggregate.memoryLimitBytes > 0) {
-    return `${formatBytes(aggregate.memoryBytes)} / ${formatBytes(aggregate.memoryLimitBytes)}`;
-  }
   return formatBytes(aggregate.memoryBytes);
 }
 

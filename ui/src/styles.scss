@@ -713,6 +713,7 @@ button[mat-icon-button] mat-icon {
 }
 
 .state-degraded,
+.state-restarting,
 .state-warning {
   --mdc-chip-elevated-container-color: var(--warning-soft);
   --mdc-chip-label-text-color: var(--warning);
@@ -1333,4 +1334,3 @@ select,
 .mat-mdc-tab {
   letter-spacing: 0 !important;
 }
-

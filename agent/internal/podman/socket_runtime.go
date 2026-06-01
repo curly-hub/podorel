@@ -167,7 +167,44 @@ func (r *PodmanSocketRuntime) DeleteContainer(ctx context.Context, containerID s
 func (r *PodmanSocketRuntime) Logs(ctx context.Context, req LogRequest) (<-chan LogLine, error) {
 	target := req.ContainerID
 	if target == "" {
-		return nil, fmt.Errorf("socket log streaming requires container id")
+		if req.PodID == "" {
+			return nil, fmt.Errorf("socket log streaming requires container id or pod id")
+		}
+		containers, err := r.ListContainers(ctx)
+		if err != nil {
+			return nil, err
+		}
+		ch := make(chan LogLine)
+		go func() {
+			defer close(ch)
+			emitted := 0
+			for _, container := range containers {
+				if container.PodID != req.PodID {
+					continue
+				}
+				containerReq := req
+				containerReq.PodID = ""
+				containerReq.ContainerID = container.ID
+				containerLines, err := r.Logs(ctx, containerReq)
+				if err != nil {
+					continue
+				}
+				for line := range containerLines {
+					if line.Source == "" || line.Source == container.ID {
+						line.Source = container.Name
+						if line.Source == "" {
+							line.Source = container.ID
+						}
+					}
+					ch <- line
+					emitted++
+					if req.LastLines > 0 && emitted >= req.LastLines {
+						return
+					}
+				}
+			}
+		}()
+		return ch, nil
 	}
 	path := "/libpod/containers/" + url.PathEscape(target) + "/logs?stdout=true&stderr=true"
 	if req.LastLines > 0 {

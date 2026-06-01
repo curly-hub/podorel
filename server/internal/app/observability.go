@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -123,6 +124,11 @@ func (a *App) readAgentLogs(ctx context.Context, agentID string, podID string, c
 	if err != nil || !ok {
 		return nil, false
 	}
+	if podID != "" && containerID == "" {
+		if lines, err := a.readAgentContainerLogs(ctx, client, agentID, podID, limit); err == nil {
+			return lines, true
+		}
+	}
 	agentLines, err := client.Logs(ctx, podID, containerID, limit)
 	if err != nil {
 		return nil, false
@@ -137,6 +143,45 @@ func (a *App) readAgentLogs(ctx context.Context, agentID string, podID string, c
 		lines = append(lines, logLine{Timestamp: timestamp, Source: source, Line: line.Line})
 	}
 	return lines, true
+}
+
+func (a *App) readAgentContainerLogs(ctx context.Context, client AgentClient, agentID string, podID string, limit int) ([]logLine, error) {
+	containers, err := a.store.ListContainers(ctx, podID, agentID)
+	if err != nil {
+		return nil, err
+	}
+	lines := []logLine{}
+	for _, container := range containers {
+		containerID := firstNonEmpty(container.PodmanContainerID, container.ID)
+		if containerID == "" {
+			continue
+		}
+		agentLines, err := client.Logs(ctx, "", containerID, limit)
+		if err != nil {
+			continue
+		}
+		for _, line := range agentLines {
+			timestamp := line.Timestamp
+			if timestamp.IsZero() {
+				timestamp = a.now()
+			}
+			source := firstNonEmpty(line.Source, container.Name, containerID)
+			if source == containerID || source == container.PodmanContainerID {
+				source = firstNonEmpty(container.Name, source)
+			}
+			lines = append(lines, logLine{Timestamp: timestamp, Source: source, Line: line.Line})
+		}
+	}
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("no container logs for pod %s", podID)
+	}
+	sort.SliceStable(lines, func(i int, j int) bool {
+		return lines[i].Timestamp.Before(lines[j].Timestamp)
+	})
+	if limit > 0 && len(lines) > limit {
+		lines = lines[len(lines)-limit:]
+	}
+	return lines, nil
 }
 
 func (a *App) liveLogLines(ctx context.Context, agentID string, podID string, containerID string) []logLine {

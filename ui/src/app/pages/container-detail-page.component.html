@@ -53,7 +53,7 @@
             @if (stats()) {
               <mat-chip-set class="chip-row">
                 <mat-chip><mat-icon>speed</mat-icon>{{ formatCpu(stats()?.cpu_percent_host_total) }} CPU</mat-chip>
-                <mat-chip><mat-icon>memory</mat-icon>{{ stats()?.memory_podman_raw || formatMemory(stats()?.memory_bytes ?? 0) }}</mat-chip>
+                <mat-chip><mat-icon>memory</mat-icon>{{ formatMemory(stats()?.memory_bytes ?? 0) }}</mat-chip>
                 <mat-chip><mat-icon>schedule</mat-icon>{{ stats()?.sampled_at | date: 'medium' }}</mat-chip>
               </mat-chip-set>
               <pre>{{ stats() | json }}</pre>

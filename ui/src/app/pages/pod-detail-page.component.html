@@ -135,7 +135,7 @@
                   <mat-progress-bar mode="determinate" [value]="sampleCpuProgress(sample)"></mat-progress-bar>
                 </div>
                 <div class="metric-row">
-                  <div><span>Memory</span><strong>{{ sample.memory_podman_raw || formatMemory(sample.memory_bytes) }}</strong></div>
+                  <div><span>Memory</span><strong>{{ formatMemory(sample.memory_bytes) }}</strong></div>
                   <mat-progress-bar mode="determinate" [value]="sampleMemoryProgress(sample)"></mat-progress-bar>
                 </div>
               </article>

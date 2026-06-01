@@ -15,7 +15,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, ApiService } from '../core/api.service';
-import { Agent, LifecycleAction, PodView } from '../core/models';
+import { Agent, LifecycleAction, PodView, SecuritySummary } from '../core/models';
 import { aggregateResourceSamples, cpuProgressValue, formatCpuPercent, formatMemoryDisplay, memoryProgressValue, StatsAggregate } from '../core/stats';
 import { ConfirmationDialogComponent, ConfirmationDialogResult } from '../shared/confirmation-dialog/confirmation-dialog.component';
 import { HelpTooltipComponent } from '../shared/help-tooltip/help-tooltip.component';
@@ -35,7 +35,7 @@ export class PodsPageComponent implements OnInit {
     scan: 'Security scan state for this pod image. Not scanned means no scanner result has been recorded yet.',
     source: 'Snapshot source tells you whether the row is live agent data or development/test cached data.',
     cpu: 'CPU comes from live Podman stats samples and is normalized against total host CPU capacity.',
-    memory: 'Memory comes from live Podman stats samples for containers in this pod.',
+    memory: 'Memory shows live usage from Podman stats samples for containers in this pod.',
     statsSource: 'This shows how many container stats rows were sampled for the current pod list.',
     containers: 'Container count and state summary for containers inside this pod.',
     uptime: 'Approximate time since the pod creation timestamp reported by Podman.',
@@ -44,6 +44,7 @@ export class PodsPageComponent implements OnInit {
 
   readonly pods = signal<PodView[]>([]);
   readonly agents = signal<Agent[]>([]);
+  readonly security = signal<SecuritySummary | null>(null);
   readonly error = signal('');
   readonly loading = signal(true);
   readonly stateFilters = ['all', 'running', 'degraded', 'stopped', 'unknown'];
@@ -60,10 +61,14 @@ export class PodsPageComponent implements OnInit {
     this.loading.set(true);
     this.error.set('');
     try {
-      const pods = await this.api.pods();
-      const agents = await this.api.agents();
+      const [pods, agents, security] = await Promise.all([
+        this.api.pods(),
+        this.api.agents(),
+        this.api.securitySummary()
+      ]);
       this.pods.set(pods);
       this.agents.set(agents);
+      this.security.set(security);
     } catch (error) {
       this.error.set(this.formatError(error));
     } finally {
@@ -155,7 +160,11 @@ export class PodsPageComponent implements OnInit {
 
   containerStateSummary(pod: PodView): string {
     const running = pod.containers.filter((container) => this.normalizedContainerState(container.state) === 'running').length;
-    const exited = pod.containers.filter((container) => ['exited', 'stopped'].includes(this.normalizedContainerState(container.state))).length;
+    const restarting = pod.containers.filter((container) => this.containerLifecycleStatus(container) === 'restarting').length;
+    const exited = pod.containers.filter((container) => ['exited', 'stopped', 'killed', 'dead', 'failed'].includes(this.normalizedContainerState(container.state))).length;
+    if (restarting > 0) {
+      return `${running} running / ${restarting} restarting`;
+    }
     if (exited > 0) {
       return `${running} running / ${exited} exited`;
     }
@@ -163,9 +172,20 @@ export class PodsPageComponent implements OnInit {
   }
 
   podIssue(pod: PodView): string {
-    if (this.normalizedState(pod) === 'degraded') {
-      const exited = pod.containers.filter((container) => ['exited', 'stopped'].includes(this.normalizedContainerState(container.state))).map((container) => container.name);
+    const restarting = this.problemContainers(pod, 'restarting');
+    if (restarting.length > 0) {
+      return `Restarting / possible bootloop: ${restarting.join(', ')}`;
+    }
+    const exited = this.problemContainers(pod, 'exited');
+    if (this.rawPodState(pod) === 'degraded') {
       return exited.length ? `Exited: ${exited.join(', ')}` : 'Podman reports this pod as degraded.';
+    }
+    if (exited.length > 0 && this.rawPodState(pod) === 'running') {
+      return `Exited while pod is running: ${exited.join(', ')}`;
+    }
+    const unhealthy = this.problemContainers(pod, 'unhealthy');
+    if (unhealthy.length > 0) {
+      return `Unhealthy: ${unhealthy.join(', ')}`;
     }
     if (pod.self_management && this.normalizedState(pod) === 'unknown') {
       return 'Dev stack: web/API runs directly on localhost, not inside a managed Podman pod.';
@@ -191,6 +211,34 @@ export class PodsPageComponent implements OnInit {
 
   podCardClass(pod: PodView): string {
     return `pod-card ${this.stateClass(pod)}`;
+  }
+
+  securityScanLabel(): string {
+    const scan = this.security()?.latest_scan;
+    if (!scan) {
+      return 'not scanned';
+    }
+    switch ((scan.status || '').toLowerCase()) {
+      case 'complete':
+        return 'scanned';
+      case 'failed':
+        return 'scan failed';
+      case 'unavailable':
+        return 'scanner unavailable';
+      default:
+        return scan.status || 'scan unknown';
+    }
+  }
+
+  securityScanIcon(): string {
+    const status = (this.security()?.latest_scan?.status || '').toLowerCase();
+    if (status === 'complete') {
+      return 'verified';
+    }
+    if (status === 'failed' || status === 'unavailable') {
+      return 'security_update_warning';
+    }
+    return 'security';
   }
 
   canStart(pod: PodView): boolean {
@@ -250,11 +298,65 @@ export class PodsPageComponent implements OnInit {
   }
 
   private normalizedState(pod: PodView): string {
-    return (pod.state || 'unknown').toLowerCase();
+    if (this.problemContainers(pod, 'restarting').length > 0) {
+      return 'degraded';
+    }
+    if (this.rawPodState(pod) === 'running' && this.problemContainers(pod, 'exited').length > 0) {
+      return 'degraded';
+    }
+    if (this.rawPodState(pod) === 'running' && this.problemContainers(pod, 'unhealthy').length > 0) {
+      return 'degraded';
+    }
+    return this.rawPodState(pod);
   }
 
   private normalizedContainerState(state: string): string {
     return (state || 'unknown').toLowerCase();
+  }
+
+  private rawPodState(pod: PodView): string {
+    return (pod.state || 'unknown').toLowerCase();
+  }
+
+  private problemContainers(pod: PodView, problem: 'restarting' | 'exited' | 'unhealthy'): string[] {
+    return pod.containers
+      .filter((container) => this.containerLifecycleStatus(container) === problem)
+      .map((container) => container.name || container.id);
+  }
+
+  private containerLifecycleStatus(container: PodView['containers'][number]): 'restarting' | 'exited' | 'unhealthy' | 'running' | 'unknown' {
+    const values = [container.state, container.health];
+    let restartCount = 0;
+    try {
+      const raw = JSON.parse(container.raw_json || '{}') as Record<string, unknown>;
+      for (const key of ['Status', 'status', 'State', 'state', 'Health', 'health', 'ExitCode', 'exit_code', 'RestartCount', 'restart_count', 'Restarts', 'restarts']) {
+        if (raw[key] !== undefined && raw[key] !== null) {
+          values.push(String(raw[key]));
+          if (['RestartCount', 'restart_count', 'Restarts', 'restarts'].includes(key)) {
+            restartCount = Math.max(restartCount, Number(raw[key]) || 0);
+          }
+        }
+      }
+    } catch {
+      values.push(container.raw_json || '');
+    }
+    const text = values.join(' ').toLowerCase();
+    if (restartCount >= 3) {
+      return 'restarting';
+    }
+    if (/(restarting|restart count|crash|back-?off|bootloop)/.test(text)) {
+      return 'restarting';
+    }
+    if (/(unhealthy|health: bad)/.test(text)) {
+      return 'unhealthy';
+    }
+    if (/(exited|stopped|killed|dead|oom|failed)/.test(text)) {
+      return 'exited';
+    }
+    if (text.includes('running')) {
+      return 'running';
+    }
+    return 'unknown';
   }
 
   private isDevelopmentSelfPlaceholder(pod: PodView): boolean {

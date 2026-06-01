@@ -461,6 +461,45 @@ func TestLogsHistoryDownloadFromAgentIsPlainText(t *testing.T) {
 	}
 }
 
+func TestLogsHistoryForPodReadsContainerLogs(t *testing.T) {
+	fake := &fakeAgentClient{}
+	harness := newTestHarnessWithAgentClient(t, fake)
+	if err := harness.store.InsertPod(context.Background(), db.Pod{
+		ID:          "pod-a",
+		AgentID:     db.PrimaryAgentID,
+		PodmanPodID: "pod-a",
+		Name:        "pod-a",
+		State:       "running",
+		Health:      "unknown",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := harness.store.InsertContainer(context.Background(), db.Container{
+		ID:                "container-a",
+		AgentID:           db.PrimaryAgentID,
+		PodID:             "pod-a",
+		PodmanContainerID: "container-a",
+		Name:              "container-a",
+		Image:             "example:latest",
+		State:             "running",
+		Health:            "unknown",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	login := harness.login(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/logs/history?agent_id=primary&pod_id=pod-a&limit=5", nil)
+	req.AddCookie(login.Cookie)
+	rec := httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("pod logs status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "hello") || len(fake.logRequests) == 0 || fake.logRequests[0] != ":container-a:5" {
+		t.Fatalf("pod logs did not read container logs: requests=%#v body=%s", fake.logRequests, rec.Body.String())
+	}
+}
+
 func TestLogsWebSocketUsesRequestedAgentTarget(t *testing.T) {
 	fake := &fakeAgentClient{logLines: []agents.LogLine{{
 		Timestamp: time.Date(2026, 5, 30, 7, 31, 0, 0, time.UTC),

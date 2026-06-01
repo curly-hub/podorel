@@ -147,7 +147,11 @@ export class PodDetailPageComponent implements OnInit {
 
   containerStateSummary(): string {
     const running = this.containers().filter((container) => this.normalizedState(container.state) === 'running').length;
+    const restarting = this.containers().filter((container) => this.containerLifecycleStatus(container) === 'restarting').length;
     const exited = this.containers().filter((container) => this.isExitedState(container.state)).length;
+    if (restarting > 0) {
+      return `${running} running / ${restarting} restarting`;
+    }
     if (exited > 0) {
       return `${running} running / ${exited} exited`;
     }
@@ -156,11 +160,22 @@ export class PodDetailPageComponent implements OnInit {
 
   podIssue(): string {
     const pod = this.pod();
-    if (!pod || this.normalizedState(pod.state) !== 'degraded') {
+    if (!pod) {
       return '';
     }
+    const restarting = this.containers().filter((container) => this.containerLifecycleStatus(container) === 'restarting').map((container) => container.name);
+    if (restarting.length > 0) {
+      return `Restarting / possible bootloop: ${restarting.join(', ')}`;
+    }
     const exited = this.containers().filter((container) => this.isExitedState(container.state)).map((container) => container.name);
-    return exited.length ? `Exited: ${exited.join(', ')}` : 'Podman reports this pod as degraded.';
+    if (this.normalizedState(pod.state) === 'degraded') {
+      return exited.length ? `Exited: ${exited.join(', ')}` : 'Podman reports this pod as degraded.';
+    }
+    if (this.normalizedState(pod.state) === 'running' && exited.length > 0) {
+      return `Exited while pod is running: ${exited.join(', ')}`;
+    }
+    const unhealthy = this.containers().filter((container) => this.containerLifecycleStatus(container) === 'unhealthy').map((container) => container.name);
+    return unhealthy.length ? `Unhealthy: ${unhealthy.join(', ')}` : '';
   }
 
   containerStats(container: Container): ResourceSample | null {
@@ -174,7 +189,7 @@ export class PodDetailPageComponent implements OnInit {
 
   containerMemoryLabel(container: Container): string {
     const sample = this.containerStats(container);
-    return sample && hasCurrentStats(sample) ? sample.memory_podman_raw || formatBytes(sample.memory_bytes) : 'unavailable';
+    return sample && hasCurrentStats(sample) ? formatBytes(sample.memory_bytes) : 'unavailable';
   }
 
   sampleCpuProgress(sample: ResourceSample): number {
@@ -240,7 +255,42 @@ export class PodDetailPageComponent implements OnInit {
   }
 
   private isExitedState(state = ''): boolean {
-    return ['exited', 'stopped', 'killed'].includes(this.normalizedState(state));
+    return ['exited', 'stopped', 'killed', 'dead', 'failed'].includes(this.normalizedState(state));
+  }
+
+  private containerLifecycleStatus(container: Container): 'restarting' | 'exited' | 'unhealthy' | 'running' | 'unknown' {
+    const values = [container.state, container.health];
+    let restartCount = 0;
+    try {
+      const raw = JSON.parse(container.raw_json || '{}') as Record<string, unknown>;
+      for (const key of ['Status', 'status', 'State', 'state', 'Health', 'health', 'ExitCode', 'exit_code', 'RestartCount', 'restart_count', 'Restarts', 'restarts']) {
+        if (raw[key] !== undefined && raw[key] !== null) {
+          values.push(String(raw[key]));
+          if (['RestartCount', 'restart_count', 'Restarts', 'restarts'].includes(key)) {
+            restartCount = Math.max(restartCount, Number(raw[key]) || 0);
+          }
+        }
+      }
+    } catch {
+      values.push(container.raw_json || '');
+    }
+    const text = values.join(' ').toLowerCase();
+    if (restartCount >= 3) {
+      return 'restarting';
+    }
+    if (/(restarting|restart count|crash|back-?off|bootloop)/.test(text)) {
+      return 'restarting';
+    }
+    if (/(unhealthy|health: bad)/.test(text)) {
+      return 'unhealthy';
+    }
+    if (/(exited|stopped|killed|dead|oom|failed)/.test(text)) {
+      return 'exited';
+    }
+    if (text.includes('running')) {
+      return 'running';
+    }
+    return 'unknown';
   }
 
   private isSeededSelfPlaceholder(): boolean {
