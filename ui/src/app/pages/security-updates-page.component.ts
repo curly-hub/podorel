@@ -196,6 +196,10 @@ sudo dnf -y install trivy`,
     return this.summary()?.scanner_available === false || scan?.status === 'unavailable' || scan?.error_code === 'SCANNER_UNAVAILABLE';
   }
 
+  scannerSetupNeeded(): boolean {
+    return !this.scannerReady() || this.scannerUnsafe();
+  }
+
   scannerNotice(): string {
     return this.scannerOptions()?.scanner_error ?? this.scanResult()?.error_message ?? this.summary()?.scanner_error ?? this.summary()?.latest_scan?.error_message ?? '';
   }
@@ -210,7 +214,7 @@ sudo dnf -y install trivy`,
     if (this.scannerUnsafe()) {
       return 'Unsafe scanner version';
     }
-    if (this.scannerReady()) {
+    if (this.scannerReady() && !this.scannerUnsafe()) {
       return 'Scanner ready';
     }
     return this.humanize(this.summary()?.status ?? this.latestScanRecord()?.status ?? 'unknown');
@@ -261,7 +265,7 @@ sudo dnf -y install trivy`,
 
   recommendedScannerOptionId(): string {
     const options = this.scannerInstallOptions();
-    if (this.scannerReady()) {
+    if (this.scannerReady() && !this.scannerUnsafe()) {
       return 'custom-scanner-path';
     }
     return options.find((option) => option.available && option.official && option.id.includes('debian'))?.id
@@ -296,7 +300,7 @@ sudo dnf -y install trivy`,
     if (this.scannerUnsafe()) {
       return ['Remove the unsafe Trivy version', 'Install a safe current release', 'Refresh, then rescan'];
     }
-    if (this.scannerReady()) {
+    if (this.scannerReady() && !this.scannerUnsafe()) {
       return ['Scanner detected', 'Run rescan when needed', 'Review findings below'];
     }
     return ['Copy one install command', 'Run it on the PoDorel host', 'Refresh, then rescan'];
@@ -321,7 +325,7 @@ sudo dnf -y install trivy`,
         detail: 'This Trivy version/tag is covered by the March 2026 supply-chain advisory. Do not run scans with it; remove it and install a known-safe current release.'
       };
     }
-    return { status: 'safe', label: `Version ${version}`, detail: 'No known PoDorel blocklist match for this installed Trivy version.' };
+    return { status: 'safe', label: `Version ${version}`, detail: 'This installed Trivy version passes the scanner safety check.' };
   }
 
   scannerVersionClass(): string {
@@ -348,7 +352,9 @@ sudo dnf -y install trivy`,
   }
 
   findingsList(): SecurityFinding[] {
-    return this.arrayOrEmpty(this.findings());
+    return [...this.arrayOrEmpty(this.findings())].sort((left, right) =>
+      this.severityRank(left.severity) - this.severityRank(right.severity) || right.id - left.id
+    );
   }
 
   imageDigestList(): ImageDigest[] {
@@ -437,6 +443,11 @@ sudo dnf -y install trivy`,
       return value;
     }
     return '0';
+  }
+
+  private severityRank(severity: string): number {
+    const rank = this.severityOrder.indexOf(this.normalizedSeverity(severity));
+    return rank >= 0 ? rank : this.severityOrder.length;
   }
 
   private normalizedSeverity(severity: string): SeverityKey {

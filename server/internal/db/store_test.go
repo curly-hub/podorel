@@ -197,3 +197,44 @@ func TestSecurityListsReturnEmptySlices(t *testing.T) {
 		t.Fatalf("updates = %#v", updates)
 	}
 }
+func TestSecurityFindingsOrderBySeverity(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+	if err := store.Bootstrap(ctx, "secret-password"); err != nil {
+		t.Fatal(err)
+	}
+	_, err := store.CreateSecurityScan(ctx, SecurityScan{
+		ID:        "scan-order",
+		AgentID:   PrimaryAgentID,
+		Status:    "complete",
+		Scanner:   "trivy",
+		StartedAt: time.Now(),
+		Summary:   map[string]any{},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InsertSecurityFindings(ctx, []SecurityFinding{
+		{ScanID: "scan-order", Target: "image", VulnerabilityID: "low-cve", Severity: "low"},
+		{ScanID: "scan-order", Target: "image", VulnerabilityID: "critical-cve", Severity: "critical"},
+		{ScanID: "scan-order", Target: "image", VulnerabilityID: "medium-cve", Severity: "medium"},
+		{ScanID: "scan-order", Target: "image", VulnerabilityID: "high-cve", Severity: "HIGH"},
+		{ScanID: "scan-order", Target: "image", VulnerabilityID: "unknown-cve", Severity: "unknown"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	listed, err := store.ListSecurityFindings(ctx, "scan-order", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"critical-cve", "high-cve", "medium-cve", "low-cve", "unknown-cve"}
+	if len(listed) != len(want) {
+		t.Fatalf("listed %d findings, want %d: %#v", len(listed), len(want), listed)
+	}
+	for i, expected := range want {
+		if listed[i].VulnerabilityID != expected {
+			t.Fatalf("finding order at %d = %q, want %q; all = %#v", i, listed[i].VulnerabilityID, expected, listed)
+		}
+	}
+}

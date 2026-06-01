@@ -60,6 +60,7 @@
       </mat-card-content>
     </mat-card>
 
+    @if (scannerSetupNeeded()) {
     <mat-card class="install-guide-card">
       <mat-card-header>
         <mat-card-title><mat-icon>terminal</mat-icon>Scanner Instructions <app-help-tooltip [text]="helpTopics.installOptions" label="Scanner instructions help"></app-help-tooltip></mat-card-title>
@@ -92,6 +93,7 @@
         }
       </mat-card-content>
     </mat-card>
+    }
   </section>
 
   @if (scannerReady()) {
@@ -100,6 +102,7 @@
         <mat-card-title><mat-icon>{{ scannerVersionIcon() }}</mat-icon>Scanner Version <app-help-tooltip [text]="helpTopics.versionSafety" label="Scanner version safety help"></app-help-tooltip></mat-card-title>
         <mat-card-subtitle>{{ scannerVersionSafety().detail }}</mat-card-subtitle>
       </mat-card-header>
+      @if (scannerVersionSafety().status !== 'safe') {
       <mat-card-content>
         <pre class="command-block">{{ verificationCommand() }}</pre>
         <button mat-stroked-button type="button" (click)="copyVerificationCommand()">
@@ -107,9 +110,11 @@
           Copy verification command
         </button>
       </mat-card-content>
+      }
     </mat-card>
   }
 
+  @if (scannerSetupNeeded()) {
   <mat-card class="install-options-card" [class.ready]="scannerReady() && !scannerUnsafe()" [class.unsafe]="scannerUnsafe()">
     <mat-card-header>
       <mat-card-title><mat-icon>download</mat-icon>Install Options <app-help-tooltip [text]="helpTopics.installOptions" label="Install options help"></app-help-tooltip></mat-card-title>
@@ -153,6 +158,8 @@
       }
     </mat-card-content>
   </mat-card>
+
+  }
 
   @if (scannerErrors()) {
     <mat-card class="error-card">

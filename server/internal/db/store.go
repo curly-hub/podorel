@@ -1070,7 +1070,7 @@ func (s *Store) ListSecurityFindings(ctx context.Context, scanID string, limit i
 		query += ` WHERE scan_id = ?`
 		args = append(args, scanID)
 	}
-	query += ` ORDER BY id DESC LIMIT ?`
+	query += ` ORDER BY CASE lower(severity) WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, id DESC LIMIT ?`
 	args = append(args, limit)
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
