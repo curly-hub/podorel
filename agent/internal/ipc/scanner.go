@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -57,7 +58,7 @@ func (s Server) handleScanImage(w http.ResponseWriter, r *http.Request) {
 		writeResult(w, nil, errors.New(status.Error))
 		return
 	}
-	raw, err := scannerCommandOutput(r.Context(), status.Path, "image", "--format", "json", "--quiet", image)
+	raw, err := scanImageWithScanner(r.Context(), status, image)
 	if err != nil {
 		writeResult(w, nil, err)
 		return
@@ -69,6 +70,38 @@ func (s Server) handleScanImage(w http.ResponseWriter, r *http.Request) {
 		Image:          image,
 		RawJSON:        string(raw),
 	}, nil)
+}
+
+func scanImageWithScanner(ctx context.Context, status scannerStatus, image string) ([]byte, error) {
+	if status.Scanner == "trivy" {
+		raw, archiveErr := scanTrivyPodmanArchive(ctx, status.Path, image)
+		if archiveErr == nil {
+			return raw, nil
+		}
+		raw, directErr := scannerCommandOutput(ctx, status.Path, "image", "--format", "json", "--quiet", image)
+		if directErr != nil {
+			return raw, errors.Join(directErr, fmt.Errorf("podman image archive scan failed: %w", archiveErr))
+		}
+		return raw, nil
+	}
+	return scannerCommandOutput(ctx, status.Path, "image", "--format", "json", "--quiet", image)
+}
+
+func scanTrivyPodmanArchive(ctx context.Context, trivyPath string, image string) ([]byte, error) {
+	podmanPath, err := exec.LookPath("podman")
+	if err != nil {
+		return nil, err
+	}
+	tempDir, err := os.MkdirTemp("", "podorel-trivy-image-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tempDir)
+	archivePath := filepath.Join(tempDir, "image.tar")
+	if _, err := scannerCommandOutput(ctx, podmanPath, "image", "save", "--format", "docker-archive", "-o", archivePath, image); err != nil {
+		return nil, err
+	}
+	return scannerCommandOutput(ctx, trivyPath, "image", "--format", "json", "--quiet", "--input", archivePath)
 }
 
 func resolveScannerStatus(ctx context.Context, scanner string) scannerStatus {

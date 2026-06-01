@@ -495,8 +495,10 @@ run_as_target_user podman build -t podorel-web:latest -f packaging/podman/Contai
 
 step "Starting user services"
 run_as_target_user systemctl --user daemon-reload
-run_as_target_user systemctl --user enable --now podorel-agent.service
-run_as_target_user systemctl --user enable --now podorel-web.service
+run_as_target_user systemctl --user enable podorel-agent.service
+run_as_target_user systemctl --user enable podorel-web.service
+run_as_target_user systemctl --user restart podorel-agent.service
+run_as_target_user systemctl --user restart podorel-web.service
 
 step "Configuring host firewall"
 configure_fedora_firewall "$OS_ID" "$LISTEN_PORT"

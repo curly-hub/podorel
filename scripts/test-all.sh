@@ -132,6 +132,24 @@ if [[ "$BUILD_DEPLOY_SCRIPT" != *"sqlite firewalld"* || "$BUILD_DEPLOY_SCRIPT" !
   exit 1
 fi
 
+podorel_step "Checking reinstall restarts upgraded services"
+if [[ "$DEPLOY_PROD_SCRIPT" == *"enable --now podorel-agent.service"* || "$DEPLOY_PROD_SCRIPT" == *"enable --now podorel-web.service"* ]]; then
+  echo "Production installer must restart already-running services after replacing binaries and units." >&2
+  exit 1
+fi
+if [[ "$DEPLOY_PROD_SCRIPT" != *"restart podorel-agent.service"* || "$DEPLOY_PROD_SCRIPT" != *"restart podorel-web.service"* ]]; then
+  echo "Production installer must restart both user services during reinstall." >&2
+  exit 1
+fi
+if [[ "$BUILD_DEPLOY_SCRIPT" == *"enable --now podorel-agent.service"* || "$BUILD_DEPLOY_SCRIPT" == *"enable --now podorel-web.service"* ]]; then
+  echo "Generated deploy bundle installer must restart already-running services after replacing binaries and units." >&2
+  exit 1
+fi
+if [[ "$BUILD_DEPLOY_SCRIPT" != *"restart podorel-agent.service"* || "$BUILD_DEPLOY_SCRIPT" != *"restart podorel-web.service"* ]]; then
+  echo "Generated deploy bundle installer must restart both user services during reinstall." >&2
+  exit 1
+fi
+
 podorel_step "Running installer dry-run checks"
 PODOREL_ADMIN_PASSWORD="test-password-for-dry-run" scripts/deploy-prod.sh --dry-run
 PROD_PORT_DRY_RUN_OUTPUT="$(PODOREL_ADMIN_PASSWORD="test-password-for-dry-run" PODOREL_PUBLIC_URL="http://curly-hub.local:9095" scripts/deploy-prod.sh --dry-run)"

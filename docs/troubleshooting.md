@@ -49,6 +49,20 @@ sudo firewall-cmd --permanent --add-port=PORT/tcp
 sudo firewall-cmd --reload
 ```
 
+## Trivy Cannot Find Local Podman Images
+
+Production scans run through the host agent. For local Podman images, the agent
+exports a temporary `podman image save` archive and asks Trivy to scan that file,
+so rootless `podman.socket` is not required just for image scanning. If scans
+still fail with messages about Docker, containerd, Podman sockets, or remote
+registry authentication, restart both PoDorel services after updating so the web
+process and host agent are on the same version.
+
+```bash
+systemctl --user restart podorel-agent.service
+systemctl --user restart podorel-web.service
+```
+
 ## Session Or CSRF Errors
 
 The UI refreshes its state-changing request token from `/api/auth/me` when it

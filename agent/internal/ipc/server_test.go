@@ -21,8 +21,12 @@ func TestServerHealthRequiresToken(t *testing.T) {
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	fakePodman := filepath.Join(binDir, "podman")
+	if err := os.WriteFile(fakePodman, []byte("#!/usr/bin/env sh\nif [ \"$1 $2 $3 $4 $5\" = \"image save --format docker-archive -o\" ]; then printf 'fake image archive' > \"$6\"; exit 0; fi\necho unsupported podman: $* >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	fakeTrivy := filepath.Join(binDir, "trivy")
-	if err := os.WriteFile(fakeTrivy, []byte("#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'Version: 0.50.0'; exit 0; fi\nif [ \"$1\" = \"image\" ]; then printf '{\"Results\":[]}'; exit 0; fi\necho unsupported >&2\nexit 1\n"), 0o755); err != nil {
+	if err := os.WriteFile(fakeTrivy, []byte("#!/usr/bin/env sh\nif [ \"$1\" = \"--version\" ]; then echo 'Version: 0.50.0'; exit 0; fi\nif [ \"$1\" = \"image\" ] && [ \"$5\" = \"--input\" ] && [ -f \"$6\" ]; then printf '{\"Results\":[]}'; exit 0; fi\necho direct scan should not be used: $* >&2\nexit 1\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
