@@ -9,8 +9,20 @@ common local operations.
 ./install.sh --yes --public-url http://podorel.lan:8080
 ```
 
+Use native HTTPS by providing both TLS files and an HTTPS public URL:
+
+```bash
+PODOREL_TLS_CERT_FILE=/home/alice/.local/share/podorel/tls/podorel.crt \
+PODOREL_TLS_KEY_FILE=/home/alice/.local/share/podorel/tls/podorel.key \
+./install.sh --yes --public-url https://podorel.lan:9095
+```
+
+When native TLS is enabled, PoDorel redirects HTTP requests on the same public
+port to HTTPS. If a reverse proxy terminates TLS, use an `https://` public URL
+and enable trusted proxy mode only for that trusted proxy.
+
 If the public URL includes an explicit port, such as
-`http://curly-hub.local:9095`, the installer publishes and listens on that port
+`https://curly-hub.local:9095`, the installer publishes and listens on that port
 unless `--listen-addr` is also supplied. On Fedora with firewalld running, the
 installer also opens that TCP port; set `PODOREL_SKIP_FIREWALL=1` to skip it.
 Other firewalls may still need a manual allow rule.
