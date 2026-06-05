@@ -34,6 +34,9 @@ export class SettingsPageComponent {
   passkeys: PasskeyCredential[] = [];
   passkeyName = this.defaultPasskeyName();
   passkeyBusy = false;
+  passkeyLoading = false;
+  passkeysLoaded = false;
+  passkeyRawCount = 0;
   passkeyError = '';
   passkeyResult = '';
   caDownloadBusy = false;
@@ -310,6 +313,22 @@ export class SettingsPageComponent {
     return `${this.passkeyCount} passkeys registered`;
   }
 
+  get passkeyLoadLabel(): string {
+    if (this.passkeyLoading) {
+      return 'Loading passkeys from API...';
+    }
+    if (!this.passkeysLoaded) {
+      return 'Passkeys not loaded yet.';
+    }
+    if (this.passkeyRawCount > 0 && this.passkeyCount === 0) {
+      return `API returned ${this.passkeyRawCount} passkey item${this.passkeyRawCount === 1 ? '' : 's'}, but none could be rendered.`;
+    }
+    if (this.passkeyCount > 0) {
+      return `Loaded ${this.passkeyCount} passkey${this.passkeyCount === 1 ? '' : 's'} from API.`;
+    }
+    return 'Loaded from API. No passkeys registered.';
+  }
+
   get canManagePasskeys(): boolean {
     return !this.passkeyBusy;
   }
@@ -361,12 +380,17 @@ export class SettingsPageComponent {
 
   async loadPasskeys(): Promise<void> {
     this.passkeyError = '';
+    this.passkeyLoading = true;
     try {
       const passkeys = await this.api.passkeys();
       this.passkeys = this.normalizePasskeys(passkeys);
     } catch (error) {
       this.passkeys = [];
+      this.passkeyRawCount = 0;
       this.passkeyError = this.formatError(error);
+    } finally {
+      this.passkeysLoaded = true;
+      this.passkeyLoading = false;
     }
   }
 
@@ -543,27 +567,33 @@ export class SettingsPageComponent {
 
   private normalizePasskeys(value: unknown): PasskeyCredential[] {
     if (!Array.isArray(value)) {
+      this.passkeyRawCount = 0;
       return [];
     }
+    this.passkeyRawCount = value.length;
     return value
-      .filter((item): item is PasskeyCredential => this.isPasskeyCredential(item))
-      .map((passkey) => ({
-        ...passkey,
-        name: this.nonEmptyText(passkey.name) || 'Unnamed passkey',
-        last_used_at: this.validDateValue(passkey.last_used_at) ?? null
-      }));
+      .map((item) => this.passkeyFromUnknown(item))
+      .filter((item): item is PasskeyCredential => item !== null);
   }
 
-  private isPasskeyCredential(value: unknown): value is PasskeyCredential {
+  private passkeyFromUnknown(value: unknown): PasskeyCredential | null {
     if (value === null || typeof value !== 'object') {
-      return false;
+      return null;
     }
-    const item = value as Partial<PasskeyCredential>;
-    return typeof item.id === 'string'
-      && typeof item.user_id === 'string'
-      && typeof item.credential_id === 'string'
-      && typeof item.created_at === 'string'
-      && typeof item.updated_at === 'string';
+    const item = value as Record<string, unknown>;
+    const id = this.nonEmptyText(item['id']);
+    if (!id) {
+      return null;
+    }
+    return {
+      id,
+      user_id: this.nonEmptyText(item['user_id']),
+      credential_id: this.nonEmptyText(item['credential_id']),
+      name: this.nonEmptyText(item['name']) || 'Unnamed passkey',
+      created_at: this.validDateValue(item['created_at']) ?? '',
+      updated_at: this.validDateValue(item['updated_at']) ?? '',
+      last_used_at: this.validDateValue(item['last_used_at'])
+    };
   }
 
   private currentDraft(): SettingsDraft {
@@ -654,7 +684,7 @@ export class SettingsPageComponent {
     }).format(new Date(valid));
   }
 
-  private validDateValue(value: string | null | undefined): string | null {
+  private validDateValue(value: unknown): string | null {
     const text = this.nonEmptyText(value);
     if (!text || text.startsWith('0001-01-01')) {
       return null;

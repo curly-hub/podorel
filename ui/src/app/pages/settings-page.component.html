@@ -125,6 +125,40 @@
           </div>
         }
 
+        <div class="passkey-load-state" [class.good]="passkeyCount > 0" [class.warning]="passkeysLoaded && passkeyRawCount > 0 && passkeyCount === 0">
+          <mat-icon>{{ passkeyLoading ? 'sync' : (passkeyCount > 0 ? 'check_circle' : 'info') }}</mat-icon>
+          <span>{{ passkeyLoadLabel }}</span>
+          <button mat-icon-button type="button" matTooltip="Reload passkeys" [disabled]="passkeyLoading" (click)="loadPasskeys()">
+            <mat-icon>refresh</mat-icon>
+          </button>
+        </div>
+
+        <div class="passkey-list">
+          @if (passkeyCount) {
+            @for (passkey of passkeyItems; track passkey.id) {
+              <article class="passkey-row">
+                <div class="passkey-row-main">
+                  <mat-icon>fingerprint</mat-icon>
+                  <div>
+                    <strong [title]="passkeyTitle(passkey)">{{ passkeyNameLabel(passkey) }}</strong>
+                    <span>{{ passkeyCredentialLabel(passkey) }}</span>
+                    <span>Created {{ passkeyCreatedLabel(passkey) }}</span>
+                    <span>Last used {{ passkeyLastUsedLabel(passkey) }}</span>
+                  </div>
+                </div>
+                <button mat-icon-button color="warn" type="button" matTooltip="Remove passkey" [disabled]="passkeyBusy" (click)="deletePasskey(passkey)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </article>
+            }
+          } @else {
+            <div class="empty-state">
+              <mat-icon>fingerprint</mat-icon>
+              <span>No passkeys registered.</span>
+            </div>
+          }
+        </div>
+
         @if (showPasskeyTrustHelp) {
           <div class="passkey-trust-panel" [class.good]="passkeySetupTone === 'good'" [class.warning]="passkeySetupTone === 'warning'" [class.danger]="passkeySetupTone === 'danger'">
             <header>
@@ -204,31 +238,6 @@
           </div>
         }
 
-        <div class="passkey-list">
-          @if (passkeyCount) {
-            @for (passkey of passkeyItems; track passkey.id) {
-              <article class="passkey-row">
-                <div class="passkey-row-main">
-                  <mat-icon>fingerprint</mat-icon>
-                  <div>
-                    <strong [title]="passkeyTitle(passkey)">{{ passkeyNameLabel(passkey) }}</strong>
-                    <span>{{ passkeyCredentialLabel(passkey) }}</span>
-                    <span>Created {{ passkeyCreatedLabel(passkey) }}</span>
-                    <span>Last used {{ passkeyLastUsedLabel(passkey) }}</span>
-                  </div>
-                </div>
-                <button mat-icon-button color="warn" type="button" matTooltip="Remove passkey" [disabled]="passkeyBusy" (click)="deletePasskey(passkey)">
-                  <mat-icon>delete</mat-icon>
-                </button>
-              </article>
-            }
-          } @else {
-            <div class="empty-state">
-              <mat-icon>fingerprint</mat-icon>
-              <span>No passkeys registered.</span>
-            </div>
-          }
-        </div>
       </section>
 
       <section class="settings-section">

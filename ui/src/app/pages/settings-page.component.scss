@@ -490,6 +490,45 @@
   gap: 10px;
 }
 
+.passkey-load-state {
+  align-items: center;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.passkey-load-state.good {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+  color: var(--success);
+}
+
+.passkey-load-state.warning {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border));
+  color: var(--warning);
+}
+
+.passkey-load-state > mat-icon {
+  flex: 0 0 auto;
+}
+
+.passkey-load-state span {
+  font-size: 13px;
+  font-weight: 800;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.passkey-load-state button {
+  color: inherit;
+}
+
 .passkey-row {
   align-items: center;
   background: var(--surface-strong);
