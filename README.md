@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/podorel-presentation.html"><strong>Open the presentation deck</strong></a>
+  <a href="docs/podorel-presentation.md"><strong>Open the presentation</strong></a>
   ·
   <a href="docs/operations.md">Operations</a>
   ·
@@ -37,7 +37,7 @@
   </tr>
 </table>
 
-![PoDorel product flow](docs/podorel-presentation-preview.svg)
+![PoDorel product presentation banner](docs/podorel-presentation-preview.svg)
 
 PoDorel is a local web console for rootless Podman pods. It gives a single
 Linux user a browser UI for pod and container lifecycle actions, logs, basic
@@ -51,8 +51,8 @@ socket or CLI. State is stored in SQLite. The UI is built with Angular Material.
 ## Product Presentation
 
 Want the quick, attractive overview first? Open the
-[PoDorel presentation deck](docs/podorel-presentation.html) for a visual pitch
-covering the problem, product, architecture, and ideal users.
+[PoDorel presentation](docs/podorel-presentation.md) for a GitHub-rendered
+visual pitch covering the problem, product, architecture, and ideal users.
 
 ## For Users
 
