@@ -6,7 +6,7 @@
 
 > The calm control room for rootless Podman.
 
-![PoDorel product presentation banner](podorel-presentation-preview.svg)
+![PoDorel product screenshot](pod-preview.png)
 
 PoDorel gives a Linux user a focused local web console for running and
 understanding rootless Podman pods. It is for people who want clear operations,

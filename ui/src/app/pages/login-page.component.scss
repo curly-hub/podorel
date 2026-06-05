@@ -93,6 +93,22 @@
   color: var(--warning);
 }
 
+.passkey-help-actions {
+  align-items: center;
+  border-top: 1px solid color-mix(in srgb, var(--warning) 28%, var(--border));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding-top: 12px;
+}
+
+.passkey-help-actions a {
+  justify-content: center;
+  min-height: 40px;
+}
+
 .passkey-copy div {
   display: grid;
   gap: 2px;
@@ -160,6 +176,10 @@
 
   .passkey-panel {
     grid-template-columns: 1fr;
+  }
+
+  .passkey-help-actions a {
+    width: 100%;
   }
 }
 

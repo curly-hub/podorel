@@ -50,6 +50,18 @@
           <mat-icon>fingerprint</mat-icon>
           Continue
         </button>
+        @if (showPasskeyTrustHelp) {
+          <div class="passkey-help-actions">
+            <a mat-stroked-button href="/api/system/tls-ca" download>
+              <mat-icon>download</mat-icon>
+              Download CA
+            </a>
+            <a mat-stroked-button [href]="currentHTTPSURL">
+              <mat-icon>open_in_new</mat-icon>
+              Open HTTPS
+            </a>
+          </div>
+        }
       </div>
 
       <mat-tab-group>

@@ -9,6 +9,8 @@ socket.
 
 - PoDorel serves HTTP by default unless native TLS is configured with
   `PODOREL_TLS_CERT_FILE` and `PODOREL_TLS_KEY_FILE`.
+- Set `PODOREL_TLS_CA_FILE` or place `podorel-local-ca.crt` beside the server
+  certificate to expose a browser-downloadable local CA for passkey setup.
 - When native TLS is enabled, PoDorel redirects HTTP requests on the same public
   port to HTTPS.
 - Passkeys require a browser-secure context. Use HTTPS with a certificate trusted

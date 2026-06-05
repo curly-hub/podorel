@@ -322,6 +322,7 @@ PUBLIC_URL="${PODOREL_PUBLIC_URL:-}"
 LISTEN_ADDR="${PODOREL_LISTEN_ADDR:-}"
 TLS_CERT_FILE="${PODOREL_TLS_CERT_FILE:-}"
 TLS_KEY_FILE="${PODOREL_TLS_KEY_FILE:-}"
+TLS_CA_FILE="${PODOREL_TLS_CA_FILE:-}"
 TRUSTED_PROXY_MODE="${PODOREL_TRUSTED_PROXY_MODE:-false}"
 TARGET_USER="${PODOREL_INSTALL_TARGET_USER:-${SUDO_USER:-${USER}}}"
 ORIGINAL_ARGS=("$@")
@@ -395,6 +396,7 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "Public URL: ${PUBLIC_URL}"
   echo "TLS cert file: ${TLS_CERT_FILE:-not configured}"
   echo "TLS key file: ${TLS_KEY_FILE:-not configured}"
+  echo "TLS CA file: ${TLS_CA_FILE:-auto-discover}"
   echo "Trusted proxy mode: ${TRUSTED_PROXY_MODE}"
   echo "Firewall: Fedora firewalld opens TCP ${LISTEN_PORT} automatically when running; otherwise allow it manually if blocked."
   require_command podman
@@ -409,9 +411,10 @@ if [ "$EUID" -ne 0 ]; then
   export PODOREL_LISTEN_ADDR="$LISTEN_ADDR"
   export PODOREL_TLS_CERT_FILE="$TLS_CERT_FILE"
   export PODOREL_TLS_KEY_FILE="$TLS_KEY_FILE"
+  export PODOREL_TLS_CA_FILE="$TLS_CA_FILE"
   export PODOREL_TRUSTED_PROXY_MODE="$TRUSTED_PROXY_MODE"
   export PODOREL_INSTALL_TARGET_USER="$TARGET_USER"
-  exec sudo --preserve-env=PODOREL_ADMIN_PASSWORD,PODOREL_PUBLIC_URL,PODOREL_LISTEN_ADDR,PODOREL_TLS_CERT_FILE,PODOREL_TLS_KEY_FILE,PODOREL_TRUSTED_PROXY_MODE,PODOREL_INSTALL_TARGET_USER bash "$0" "${ORIGINAL_ARGS[@]}"
+  exec sudo --preserve-env=PODOREL_ADMIN_PASSWORD,PODOREL_PUBLIC_URL,PODOREL_LISTEN_ADDR,PODOREL_TLS_CERT_FILE,PODOREL_TLS_KEY_FILE,PODOREL_TLS_CA_FILE,PODOREL_TRUSTED_PROXY_MODE,PODOREL_INSTALL_TARGET_USER bash "$0" "${ORIGINAL_ARGS[@]}"
 fi
 
 for required in bin/podorel bin/podorel-agent bin/podorel-web ui/index.html server/migrations server/templates packaging/systemd/podorel-agent.service packaging/systemd/podorel-web.service packaging/podman/Containerfile.web-prebuilt; do
@@ -482,6 +485,7 @@ PODOREL_LISTEN_ADDR=${LISTEN_ADDR}
 PODOREL_PUBLIC_URL=${PUBLIC_URL}
 PODOREL_TLS_CERT_FILE=${TLS_CERT_FILE}
 PODOREL_TLS_KEY_FILE=${TLS_KEY_FILE}
+PODOREL_TLS_CA_FILE=${TLS_CA_FILE}
 PODOREL_TRUSTED_PROXY_MODE=${TRUSTED_PROXY_MODE}
 PODOREL_MODE=production
 PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock

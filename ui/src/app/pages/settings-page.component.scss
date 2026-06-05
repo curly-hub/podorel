@@ -337,6 +337,96 @@
   color: var(--success);
 }
 
+.passkey-trust-panel {
+  background: color-mix(in srgb, var(--brand) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, var(--border));
+  border-radius: var(--radius);
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.passkey-trust-panel header {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.passkey-trust-panel header mat-icon {
+  color: var(--brand);
+  flex: 0 0 auto;
+}
+
+.passkey-trust-panel header div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.passkey-trust-panel strong,
+.passkey-trust-panel span {
+  overflow-wrap: anywhere;
+}
+
+.passkey-trust-panel header strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.passkey-trust-panel header span,
+.passkey-trust-panel li span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.passkey-trust-panel ol {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.passkey-trust-panel li {
+  align-items: flex-start;
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-width: 0;
+}
+
+.passkey-trust-panel li strong {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--brand);
+  display: inline-flex;
+  font-size: 12px;
+  height: 24px;
+  justify-content: center;
+  line-height: 1;
+  width: 24px;
+}
+
+.trust-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.trust-actions button:not([mat-icon-button]),
+.trust-actions a {
+  justify-content: center;
+  min-height: 40px;
+}
+
 .passkey-list {
   display: grid;
   gap: 10px;

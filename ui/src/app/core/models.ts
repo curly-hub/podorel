@@ -252,6 +252,7 @@ export interface AppSettings {
     trusted_proxy_mode: boolean;
     tls_cert_file?: string;
     tls_key_file?: string;
+    tls_ca_file?: string;
   };
   auth?: {
     session_ttl: number;

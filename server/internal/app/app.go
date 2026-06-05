@@ -133,6 +133,7 @@ func (a *App) Handler() http.Handler {
 
 func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/health", a.handleHealth)
+	mux.HandleFunc("GET /api/system/tls-ca", a.handleTLSCA)
 	mux.HandleFunc("GET /api/system/status", a.withSession(a.handleSystemStatus))
 	mux.HandleFunc("POST /api/auth/login", a.handlePasswordLogin)
 	mux.HandleFunc("POST /api/auth/login-agent-token", a.handleAgentTokenLogin)

@@ -53,6 +53,7 @@ OS_ID="$(podorel_detect_os_id)"
 echo "Detected supported OS: ${OS_ID}"
 
 echo "HTTPS: set PODOREL_TLS_CERT_FILE and PODOREL_TLS_KEY_FILE to make PoDorel serve native TLS."
+echo "Passkey local CA download: set PODOREL_TLS_CA_FILE, or place podorel-local-ca.crt beside the server certificate."
 echo "Reverse proxy mode: set PODOREL_TRUSTED_PROXY_MODE=true when TLS is terminated before PoDorel."
 
 TARGET_USER="${PODOREL_INSTALL_TARGET_USER:-${SUDO_USER:-$USER}}"
@@ -68,6 +69,7 @@ PUBLIC_URL="${PODOREL_PUBLIC_URL:-}"
 LISTEN_ADDR="${PODOREL_LISTEN_ADDR:-}"
 TLS_CERT_FILE="${PODOREL_TLS_CERT_FILE:-}"
 TLS_KEY_FILE="${PODOREL_TLS_KEY_FILE:-}"
+TLS_CA_FILE="${PODOREL_TLS_CA_FILE:-}"
 TRUSTED_PROXY_MODE="${PODOREL_TRUSTED_PROXY_MODE:-false}"
 podorel_resolve_public_url_and_listen_addr PUBLIC_URL LISTEN_ADDR
 LISTEN_PORT="$(podorel_listen_port "$LISTEN_ADDR")"
@@ -99,6 +101,7 @@ if [ "$DRY_RUN" = "1" ]; then
   echo "Public URL: ${PUBLIC_URL}"
   echo "TLS cert file: ${TLS_CERT_FILE:-not configured}"
   echo "TLS key file: ${TLS_KEY_FILE:-not configured}"
+  echo "TLS CA file: ${TLS_CA_FILE:-auto-discover}"
   echo "Trusted proxy mode: ${TRUSTED_PROXY_MODE}"
   echo "Firewall: Fedora firewalld opens TCP ${LISTEN_PORT} automatically when running; otherwise allow it manually if blocked."
   podorel_step "Dry run complete"
@@ -161,6 +164,7 @@ PODOREL_LISTEN_ADDR=${LISTEN_ADDR}
 PODOREL_PUBLIC_URL=${PUBLIC_URL}
 PODOREL_TLS_CERT_FILE=${TLS_CERT_FILE}
 PODOREL_TLS_KEY_FILE=${TLS_KEY_FILE}
+PODOREL_TLS_CA_FILE=${TLS_CA_FILE}
 PODOREL_TRUSTED_PROXY_MODE=${TRUSTED_PROXY_MODE}
 PODOREL_MODE=production
 PODOREL_AGENT_SOCKET=/run/podorel-agent/podorel-agent.sock

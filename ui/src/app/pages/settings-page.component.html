@@ -125,6 +125,42 @@
           </div>
         }
 
+        @if (showPasskeyTrustHelp) {
+          <div class="passkey-trust-panel">
+            <header>
+              <mat-icon>verified_user</mat-icon>
+              <div>
+                <strong>Trust PoDorel for passkeys</strong>
+                <span>Browsers require the local CA to be trusted before passkeys can run on this HTTPS origin.</span>
+              </div>
+            </header>
+            <ol>
+              <li><strong>1</strong><span>Download the PoDorel local CA certificate.</span></li>
+              <li><strong>2</strong><span>Open the certificate and trust it for websites in this browser or operating system.</span></li>
+              <li><strong>3</strong><span>Reopen PoDorel with HTTPS, then register the passkey again.</span></li>
+            </ol>
+            <div class="trust-actions">
+              <button mat-stroked-button type="button" [disabled]="caDownloadBusy" (click)="downloadLocalCA()">
+                <mat-icon>{{ caDownloadBusy ? 'sync' : 'download' }}</mat-icon>
+                {{ caDownloadBusy ? 'Downloading' : 'Download CA' }}
+              </button>
+              <a mat-stroked-button [href]="currentHTTPSURL">
+                <mat-icon>open_in_new</mat-icon>
+                Open HTTPS
+              </a>
+              <button mat-icon-button type="button" matTooltip="Copy HTTPS URL" (click)="copyHTTPSURL()">
+                <mat-icon>content_copy</mat-icon>
+              </button>
+            </div>
+            @if (caResult) {
+              <div class="inline-message good">
+                <mat-icon>check_circle</mat-icon>
+                <span>{{ caResult }}</span>
+              </div>
+            }
+          </div>
+        }
+
         <div class="passkey-enroll">
           <mat-form-field appearance="outline">
             <mat-label>Passkey name</mat-label>

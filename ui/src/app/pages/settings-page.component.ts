@@ -36,6 +36,8 @@ export class SettingsPageComponent {
   passkeyBusy = false;
   passkeyError = '';
   passkeyResult = '';
+  caDownloadBusy = false;
+  caResult = '';
   settingsBusy = false;
   saving = false;
   execEnabled = false;
@@ -240,6 +242,19 @@ export class SettingsPageComponent {
     return passkeyUnavailableMessage();
   }
 
+  get showPasskeyTrustHelp(): boolean {
+    return !passkeySecureContext() || this.looksLikePasskeyTrustIssue(this.passkeyError) || this.looksLikePasskeyTrustIssue(this.passkeyWarning);
+  }
+
+  get currentHTTPSURL(): string {
+    if (typeof location === 'undefined') {
+      return 'https://curly-hub.local:9095';
+    }
+    const url = new URL(location.href);
+    url.protocol = 'https:';
+    return url.href;
+  }
+
   get passkeyStatus(): string {
     if (this.passkeyCount === 0) {
       return 'No passkeys registered';
@@ -313,6 +328,7 @@ export class SettingsPageComponent {
   async registerPasskey(): Promise<void> {
     this.passkeyError = '';
     this.passkeyResult = '';
+    this.caResult = '';
     try {
       if (!this.passkeyReady || this.agentScopedSession) {
         throw new Error(this.passkeyWarning || 'Passkeys are not available.');
@@ -336,10 +352,50 @@ export class SettingsPageComponent {
     }
   }
 
+  async downloadLocalCA(): Promise<void> {
+    this.caDownloadBusy = true;
+    this.caResult = '';
+    try {
+      const blob = await this.api.downloadTLSCA();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'podorel-local-ca.crt';
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      this.caResult = 'Local CA downloaded. Open it, trust it for websites, then reopen PoDorel over HTTPS.';
+      this.snackBar.open(this.caResult, 'Dismiss', { duration: 6500 });
+    } catch (error) {
+      this.passkeyError = this.formatError(error);
+      this.snackBar.open(this.passkeyError, 'Dismiss', { duration: 6500 });
+    } finally {
+      this.caDownloadBusy = false;
+    }
+  }
+
+  async copyHTTPSURL(): Promise<void> {
+    this.caResult = '';
+    const url = this.currentHTTPSURL;
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard unavailable.');
+      }
+      await navigator.clipboard.writeText(url);
+      this.caResult = `Copied ${url}`;
+    } catch {
+      this.caResult = `Open ${url}`;
+    }
+    this.snackBar.open(this.caResult, 'Dismiss', { duration: 4500 });
+  }
+
   async deletePasskey(passkey: PasskeyCredential): Promise<void> {
     this.passkeyBusy = true;
     this.passkeyError = '';
     this.passkeyResult = '';
+    this.caResult = '';
     try {
       await this.api.deletePasskey(passkey.id);
       this.passkeyResult = `Removed ${passkey.name}.`;
@@ -489,6 +545,10 @@ export class SettingsPageComponent {
       return `PoDorel on ${location.hostname}`;
     }
     return 'PoDorel passkey';
+  }
+
+  private looksLikePasskeyTrustIssue(message: string): boolean {
+    return /local ca|insecure|unsecure|unsecured|secure browser context|not trusted/i.test(message);
   }
 
   private formatError(error: unknown): string {

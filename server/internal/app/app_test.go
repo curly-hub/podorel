@@ -133,6 +133,73 @@ func TestSessionCookieSecureFollowsHTTPSConfig(t *testing.T) {
 	}
 }
 
+func TestTLSCADownloadUsesConfiguredFile(t *testing.T) {
+	dir := t.TempDir()
+	caPath := filepath.Join(dir, "custom-ca.crt")
+	caPEM := []byte("-----BEGIN CERTIFICATE-----\nconfigured\n-----END CERTIFICATE-----\n")
+	if err := os.WriteFile(caPath, caPEM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app := &App{cfg: config.Config{Server: config.ServerConfig{TLSCAFile: caPath}}}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/system/tls-ca", nil)
+	rec := httptest.NewRecorder()
+	app.handleTLSCA(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tls ca status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Body.Bytes(); !bytes.Equal(got, caPEM) {
+		t.Fatalf("tls ca body = %q, want %q", got, caPEM)
+	}
+	if got := rec.Header().Get("Content-Disposition"); !strings.Contains(got, `filename="podorel-local-ca.crt"`) {
+		t.Fatalf("content disposition = %q", got)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/x-x509-ca-cert" {
+		t.Fatalf("content type = %q", got)
+	}
+}
+
+func TestTLSCADownloadDiscoversCAInTLSCertDirectory(t *testing.T) {
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "podorel.crt")
+	caPath := filepath.Join(dir, localCAFilename)
+	caPEM := []byte("-----BEGIN CERTIFICATE-----\ndiscovered\n-----END CERTIFICATE-----\n")
+	if err := os.WriteFile(certPath, []byte("server cert"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(caPath, caPEM, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app := &App{cfg: config.Config{Server: config.ServerConfig{TLSCertFile: certPath}}}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/system/tls-ca", nil)
+	rec := httptest.NewRecorder()
+	app.handleTLSCA(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tls ca status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Body.Bytes(); !bytes.Equal(got, caPEM) {
+		t.Fatalf("tls ca body = %q, want %q", got, caPEM)
+	}
+}
+
+func TestTLSCADownloadUnavailable(t *testing.T) {
+	app := &App{}
+	req := httptest.NewRequest(http.MethodGet, "/api/system/tls-ca", nil)
+	rec := httptest.NewRecorder()
+
+	app.handleTLSCA(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("missing tls ca status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "TLS_CA_UNAVAILABLE") {
+		t.Fatalf("missing tls ca body = %s", rec.Body.String())
+	}
+}
+
 func TestAgentTokenLoginIsScoped(t *testing.T) {
 	harness := newTestHarness(t)
 	admin := harness.login(t)

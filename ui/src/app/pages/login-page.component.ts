@@ -38,6 +38,19 @@ export class LoginPageComponent implements OnInit {
     return passkeyUnavailableMessage() || 'Use your device passkey.';
   }
 
+  get showPasskeyTrustHelp(): boolean {
+    return !passkeySecureContext() || /local ca|insecure|unsecure|unsecured|not trusted/i.test(this.error);
+  }
+
+  get currentHTTPSURL(): string {
+    if (typeof location === 'undefined') {
+      return 'https://curly-hub.local:9095';
+    }
+    const url = new URL(location.href);
+    url.protocol = 'https:';
+    return url.href;
+  }
+
   ngOnInit(): void {
     void this.redirectIfAlreadyAuthenticated();
   }

@@ -59,6 +59,7 @@ type ServerConfig struct {
 	TrustedProxyMode bool   `json:"trusted_proxy_mode"`
 	TLSCertFile      string `json:"tls_cert_file"`
 	TLSKeyFile       string `json:"tls_key_file"`
+	TLSCAFile        string `json:"tls_ca_file"`
 }
 
 type AgentConfig struct {
@@ -110,6 +111,7 @@ func Load(args []string, getenv getenvFunc) (Config, error) {
 	trustedProxyMode := fs.Bool("trusted-proxy-mode", trustedProxyModeDefault, "trust X-Forwarded-Proto and X-Forwarded-Host headers")
 	tlsCertFile := fs.String("tls-cert-file", envOrDefault(getenv, "PODOREL_TLS_CERT_FILE", ""), "TLS certificate file for native HTTPS")
 	tlsKeyFile := fs.String("tls-key-file", envOrDefault(getenv, "PODOREL_TLS_KEY_FILE", ""), "TLS private key file for native HTTPS")
+	tlsCAFile := fs.String("tls-ca-file", envOrDefault(getenv, "PODOREL_TLS_CA_FILE", ""), "local CA certificate file browsers can import for passkeys")
 	dbPath := fs.String("db-path", expandHome(envOrDefault(getenv, "PODOREL_DB_PATH", DefaultDatabasePath)), "SQLite database path")
 	uiDistPath := fs.String("ui-dist-path", envOrDefault(getenv, "PODOREL_UI_DIST_PATH", DefaultUIDistPath), "Angular distribution path")
 	if err := fs.Parse(args); err != nil {
@@ -135,6 +137,7 @@ func Load(args []string, getenv getenvFunc) (Config, error) {
 			TrustedProxyMode: *trustedProxyMode,
 			TLSCertFile:      *tlsCertFile,
 			TLSKeyFile:       *tlsKeyFile,
+			TLSCAFile:        *tlsCAFile,
 		},
 		Agent: AgentConfig{
 			PrimarySocketPath: defaultAgentSocketPath(getenv),

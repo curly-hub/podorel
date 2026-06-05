@@ -124,6 +124,14 @@ export class ApiService {
     return this.get<Record<string, unknown>>('/api/health');
   }
 
+  async downloadTLSCA(): Promise<Blob> {
+    const response = await fetch('/api/system/tls-ca', { credentials: 'include' });
+    if (!response.ok) {
+      await this.unwrap<never>(response);
+    }
+    return response.blob();
+  }
+
   systemStatus(): Promise<SystemStatus> {
     return this.get<SystemStatus>('/api/system/status');
   }

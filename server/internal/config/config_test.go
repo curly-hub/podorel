@@ -89,6 +89,8 @@ func TestLoadHTTPSEnvironment(t *testing.T) {
 			return "/app/data/tls/curly-hub.local.crt"
 		case "PODOREL_TLS_KEY_FILE":
 			return "/app/data/tls/curly-hub.local.key"
+		case "PODOREL_TLS_CA_FILE":
+			return "/app/data/tls/podorel-local-ca.crt"
 		case "PODOREL_TRUSTED_PROXY_MODE":
 			return "true"
 		default:
@@ -106,6 +108,9 @@ func TestLoadHTTPSEnvironment(t *testing.T) {
 	}
 	if cfg.Server.TLSCertFile != "/app/data/tls/curly-hub.local.crt" || cfg.Server.TLSKeyFile != "/app/data/tls/curly-hub.local.key" {
 		t.Fatalf("tls files = %#v", cfg.Server)
+	}
+	if cfg.Server.TLSCAFile != "/app/data/tls/podorel-local-ca.crt" {
+		t.Fatalf("tls ca file = %#v", cfg.Server)
 	}
 }
 

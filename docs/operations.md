@@ -14,12 +14,17 @@ Use native HTTPS by providing both TLS files and an HTTPS public URL:
 ```bash
 PODOREL_TLS_CERT_FILE=/home/alice/.local/share/podorel/tls/podorel.crt \
 PODOREL_TLS_KEY_FILE=/home/alice/.local/share/podorel/tls/podorel.key \
+PODOREL_TLS_CA_FILE=/home/alice/.local/share/podorel/tls/podorel-local-ca.crt \
 ./install.sh --yes --public-url https://podorel.lan:9095
 ```
 
 When native TLS is enabled, PoDorel redirects HTTP requests on the same public
 port to HTTPS. If a reverse proxy terminates TLS, use an `https://` public URL
 and enable trusted proxy mode only for that trusted proxy.
+
+If `PODOREL_TLS_CA_FILE` is omitted, PoDorel looks for `podorel-local-ca.crt`,
+`podorel-ca.crt`, or `ca.crt` beside the configured server certificate. The UI
+uses that file for the passkey trust download.
 
 If the public URL includes an explicit port, such as
 `https://curly-hub.local:9095`, the installer publishes and listens on that port

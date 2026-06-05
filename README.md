@@ -26,7 +26,7 @@
   <a href="docs/limitations.md">Limits</a>
 </p>
 
-![PoDorel product presentation banner](docs/podorel-presentation-preview.svg)
+![PoDorel product screenshot](docs/pod-preview.png)
 
 PoDorel is a local web console for rootless Podman pods. It gives a Linux user
 a browser UI for lifecycle actions, logs, resource stats, pod templates, Compose
@@ -81,6 +81,7 @@ PoDorel can serve native HTTPS when both TLS files are configured:
 ```bash
 PODOREL_TLS_CERT_FILE=/path/to/podorel.crt \
 PODOREL_TLS_KEY_FILE=/path/to/podorel.key \
+PODOREL_TLS_CA_FILE=/path/to/podorel-local-ca.crt \
 ./install.sh --yes --public-url https://podorel.lan:9095
 ```
 
@@ -90,7 +91,8 @@ to `https://...` and enable trusted proxy mode only for a proxy you control.
 
 Passkeys require a browser-secure context. Use `https://...` with a certificate
 trusted by the browser, or `localhost` for development. If you use a local CA,
-trust the CA in your OS/browser before registering a passkey.
+PoDorel can offer the CA as a Settings/Login download when `PODOREL_TLS_CA_FILE`
+is set or `podorel-local-ca.crt` sits beside the configured server certificate.
 
 ## Install
 
@@ -111,6 +113,7 @@ Use HTTPS by providing TLS files and an HTTPS public URL:
 ```bash
 PODOREL_TLS_CERT_FILE=/home/alice/.local/share/podorel/tls/podorel.crt \
 PODOREL_TLS_KEY_FILE=/home/alice/.local/share/podorel/tls/podorel.key \
+PODOREL_TLS_CA_FILE=/home/alice/.local/share/podorel/tls/podorel-local-ca.crt \
 ./install.sh --yes --public-url https://podorel.lan:9095
 ```
 
