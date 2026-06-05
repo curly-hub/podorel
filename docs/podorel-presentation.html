@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PoDorel Presentation</title>
+    <style>
+      :root {
+        --bg: #eef5f2;
+        --surface: #ffffff;
+        --surface-strong: #f7fbf9;
+        --ink: #10221f;
+        --ink-soft: #415a54;
+        --muted: #6b7d78;
+        --line: #d3e0dc;
+        --line-strong: #a9beb8;
+        --brand: #006d75;
+        --brand-strong: #064f55;
+        --brand-soft: #d9f2f1;
+        --accent: #b85f1a;
+        --accent-soft: #fff0e3;
+        --success: #157347;
+        --success-soft: #e0f4ea;
+        --warning: #8a5a00;
+        --warning-soft: #fff3cf;
+        --danger: #b3261e;
+        --danger-soft: #ffe9e6;
+        --shadow: 0 18px 50px rgba(16, 34, 31, .14);
+        --radius: 8px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        background:
+          linear-gradient(180deg, #fbfdfc 0, var(--bg) 340px),
+          var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        margin: 0;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .deck {
+        min-height: 100vh;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .topbar {
+        align-items: center;
+        display: flex;
+        gap: 18px;
+        inset: 0 0 auto 0;
+        justify-content: space-between;
+        padding: 18px 28px;
+        position: fixed;
+        z-index: 10;
+      }
+
+      .brand {
+        align-items: center;
+        display: inline-flex;
+        gap: 11px;
+        min-width: 0;
+      }
+
+      .brand img {
+        height: 34px;
+        width: 34px;
+      }
+
+      .brand strong {
+        color: var(--brand-strong);
+        font-size: 15px;
+        letter-spacing: 0;
+      }
+
+      .progress {
+        background: rgba(255, 255, 255, .76);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        flex: 1 1 auto;
+        height: 8px;
+        max-width: 420px;
+        overflow: hidden;
+      }
+
+      .progress span {
+        background: linear-gradient(90deg, var(--brand), var(--accent));
+        display: block;
+        height: 100%;
+        transition: width .22s ease;
+        width: 0;
+      }
+
+      .top-actions {
+        align-items: center;
+        display: inline-flex;
+        gap: 8px;
+      }
+
+      .nav-button {
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--brand-strong);
+        cursor: pointer;
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 800;
+        gap: 7px;
+        min-height: 36px;
+        padding: 0 13px;
+      }
+
+      .nav-button:hover,
+      .nav-button:focus-visible {
+        border-color: var(--brand);
+        outline: none;
+      }
+
+      .slide {
+        align-items: center;
+        display: none;
+        min-height: 100vh;
+        padding: 88px 6vw 56px;
+      }
+
+      .slide.active {
+        display: grid;
+      }
+
+      .slide-inner {
+        display: grid;
+        gap: 36px;
+        margin: 0 auto;
+        max-width: 1180px;
+        width: 100%;
+      }
+
+      .split {
+        align-items: center;
+        grid-template-columns: minmax(0, 1fr) minmax(360px, .86fr);
+      }
+
+      .content {
+        min-width: 0;
+      }
+
+      .eyebrow {
+        align-items: center;
+        color: var(--brand);
+        display: inline-flex;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0;
+        margin-bottom: 14px;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2 {
+        color: var(--ink);
+        font-weight: 900;
+        letter-spacing: 0;
+        line-height: 1.02;
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(42px, 7vw, 86px);
+        max-width: 960px;
+      }
+
+      h2 {
+        font-size: clamp(34px, 5vw, 62px);
+        max-width: 980px;
+      }
+
+      p {
+        color: var(--ink-soft);
+        font-size: clamp(18px, 2vw, 24px);
+        line-height: 1.38;
+        margin: 18px 0 0;
+        max-width: 850px;
+      }
+
+      .hero-copy {
+        max-width: 760px;
+      }
+
+      .hero-copy p {
+        font-size: clamp(20px, 2.3vw, 28px);
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 30px;
+      }
+
+      .tag {
+        align-items: center;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--brand-strong);
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 850;
+        min-height: 34px;
+        padding: 0 12px;
+      }
+
+      .visual-panel,
+      .feature-card,
+      .metric-card,
+      .quote-panel,
+      .architecture-panel,
+      .closing-panel {
+        background: rgba(255, 255, 255, .9);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        min-width: 0;
+      }
+
+      .visual-panel {
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+      }
+
+      .browser-bar {
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 8px;
+        padding-bottom: 12px;
+      }
+
+      .dot {
+        border-radius: 999px;
+        display: inline-block;
+        height: 10px;
+        width: 10px;
+      }
+
+      .dot.red {
+        background: var(--danger);
+      }
+
+      .dot.yellow {
+        background: var(--warning);
+      }
+
+      .dot.green {
+        background: var(--success);
+      }
+
+      .url {
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        flex: 1 1 auto;
+        font-size: 12px;
+        font-weight: 750;
+        min-width: 0;
+        overflow: hidden;
+        padding: 6px 10px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .console-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .mini-tile {
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        display: grid;
+        gap: 8px;
+        min-height: 104px;
+        padding: 14px;
+      }
+
+      .mini-tile strong {
+        color: var(--ink);
+        font-size: 28px;
+        font-weight: 900;
+      }
+
+      .mini-tile span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .state-row {
+        align-items: center;
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        display: flex;
+        gap: 10px;
+        min-height: 54px;
+        padding: 10px 12px;
+      }
+
+      .state-icon {
+        align-items: center;
+        background: var(--brand-soft);
+        border-radius: 999px;
+        color: var(--brand-strong);
+        display: inline-flex;
+        flex: 0 0 30px;
+        font-weight: 900;
+        height: 30px;
+        justify-content: center;
+        width: 30px;
+      }
+
+      .state-row div {
+        min-width: 0;
+      }
+
+      .state-row strong,
+      .state-row span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .state-row strong {
+        font-size: 14px;
+      }
+
+      .state-row span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .problem-list,
+      .feature-grid,
+      .metric-grid,
+      .roadmap-grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .feature-grid,
+      .metric-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .roadmap-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .problem-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-top: 12px;
+      }
+
+      .feature-card,
+      .metric-card {
+        box-shadow: none;
+        display: grid;
+        gap: 12px;
+        min-height: 190px;
+        padding: 18px;
+      }
+
+      .metric-card {
+        min-height: 150px;
+      }
+
+      .feature-card .icon,
+      .metric-card .icon {
+        align-items: center;
+        background: var(--brand-soft);
+        border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
+        border-radius: 999px;
+        color: var(--brand-strong);
+        display: inline-flex;
+        font-size: 18px;
+        font-weight: 900;
+        height: 40px;
+        justify-content: center;
+        width: 40px;
+      }
+
+      .feature-card h3,
+      .metric-card h3 {
+        color: var(--ink);
+        font-size: 20px;
+        line-height: 1.15;
+        margin: 0;
+      }
+
+      .feature-card p,
+      .metric-card p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+        margin: 0;
+      }
+
+      .metric-card strong {
+        color: var(--brand-strong);
+        font-size: 36px;
+        line-height: 1;
+      }
+
+      .architecture-panel {
+        box-shadow: none;
+        display: grid;
+        gap: 18px;
+        padding: 22px;
+      }
+
+      .arch-row {
+        align-items: stretch;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .arch-box {
+        background: var(--surface-strong);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        display: grid;
+        gap: 8px;
+        min-height: 140px;
+        padding: 16px;
+        position: relative;
+      }
+
+      .arch-box:before {
+        background: var(--brand);
+        content: "";
+        height: 3px;
+        inset: 0 0 auto 0;
+        position: absolute;
+      }
+
+      .arch-box:nth-child(2):before {
+        background: var(--accent);
+      }
+
+      .arch-box:nth-child(3):before {
+        background: var(--success);
+      }
+
+      .arch-box strong {
+        font-size: 18px;
+      }
+
+      .arch-box span {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .quote-panel {
+        box-shadow: none;
+        display: grid;
+        gap: 14px;
+        padding: 26px;
+      }
+
+      .quote-panel blockquote {
+        color: var(--ink);
+        font-size: clamp(26px, 4vw, 46px);
+        font-weight: 900;
+        line-height: 1.12;
+        margin: 0;
+      }
+
+      .quote-panel span {
+        color: var(--muted);
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .closing-panel {
+        align-items: center;
+        display: grid;
+        gap: 22px;
+        justify-items: center;
+        padding: 42px;
+        text-align: center;
+      }
+
+      .closing-panel img {
+        height: 72px;
+        width: 72px;
+      }
+
+      .closing-panel h2 {
+        max-width: 900px;
+      }
+
+      .speaker-note {
+        background: color-mix(in srgb, var(--accent-soft) 80%, var(--surface));
+        border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+        border-radius: var(--radius);
+        color: var(--ink-soft);
+        font-size: 14px;
+        line-height: 1.45;
+        margin-top: 22px;
+        padding: 12px 14px;
+      }
+
+      @media (max-width: 980px) {
+        .topbar {
+          padding: 14px 16px;
+        }
+
+        .progress {
+          display: none;
+        }
+
+        .slide {
+          padding: 84px 18px 34px;
+        }
+
+        .split,
+        .feature-grid,
+        .metric-grid,
+        .problem-list,
+        .roadmap-grid,
+        .arch-row {
+          grid-template-columns: 1fr;
+        }
+
+        .visual-panel {
+          order: -1;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .brand strong,
+        .nav-button span {
+          display: none;
+        }
+
+        .top-actions {
+          margin-left: auto;
+        }
+
+        .console-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media print {
+        body {
+          background: #ffffff;
+        }
+
+        .topbar {
+          display: none;
+        }
+
+        .slide {
+          break-after: page;
+          display: grid !important;
+          min-height: 100vh;
+          padding: 32px;
+        }
+
+        .speaker-note {
+          display: block;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="deck">
+      <header class="topbar">
+        <div class="brand">
+          <img src="../ui/public/logo-mark.svg" alt="PoDorel logo">
+          <strong>PoDorel pitch deck</strong>
+        </div>
+        <div class="progress" aria-hidden="true"><span id="progressBar"></span></div>
+        <div class="top-actions">
+          <button class="nav-button" type="button" id="prevButton" aria-label="Previous slide">
+            <span>Prev</span>
+          </button>
+          <button class="nav-button" type="button" id="nextButton" aria-label="Next slide">
+            <span>Next</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="slide active" data-slide>
+        <div class="slide-inner split">
+          <div class="content hero-copy">
+            <span class="eyebrow">Local Podman operations, made visible</span>
+            <h1>PoDorel is the calm control room for rootless Podman.</h1>
+            <p>Run pods, inspect logs, deploy templates, watch resource use, and keep security posture visible from one focused web console.</p>
+            <div class="cta-row">
+              <span class="tag">Rootless Podman</span>
+              <span class="tag">Local-first</span>
+              <span class="tag">Agent-based</span>
+              <span class="tag">Audit-ready</span>
+            </div>
+          </div>
+          <div class="visual-panel" aria-label="PoDorel interface preview">
+            <div class="browser-bar">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+              <span class="url">https://curly-hub.local:9095/dashboard</span>
+            </div>
+            <div class="console-grid">
+              <div class="mini-tile">
+                <span>Pods</span>
+                <strong>12</strong>
+                <small>9 running / 3 stopped</small>
+              </div>
+              <div class="mini-tile">
+                <span>Memory</span>
+                <strong>3.8 GiB</strong>
+                <small>Live Podman stats</small>
+              </div>
+              <div class="mini-tile">
+                <span>Security</span>
+                <strong>Ready</strong>
+                <small>Scanner and digests</small>
+              </div>
+              <div class="mini-tile">
+                <span>Agents</span>
+                <strong>2/2</strong>
+                <small>Healthy sockets</small>
+              </div>
+            </div>
+            <div class="state-row">
+              <span class="state-icon">P</span>
+              <div>
+                <strong>postgres-adminer</strong>
+                <span>Compose stack, capped memory, audit trail enabled</span>
+              </div>
+            </div>
+            <div class="state-row">
+              <span class="state-icon">S</span>
+              <div>
+                <strong>static-nginx</strong>
+                <span>Template pod, logs retained for 7 days</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide>
+        <div class="slide-inner">
+          <div class="content">
+            <span class="eyebrow">The problem</span>
+            <h2>Rootless Podman is powerful, but day-to-day operations are scattered.</h2>
+            <p>People bounce between terminals, logs, systemd user services, scripts, Compose folders, scanner output, and memory numbers that are hard to compare.</p>
+          </div>
+          <div class="problem-list">
+            <article class="feature-card">
+              <span class="icon">1</span>
+              <h3>State is hard to see</h3>
+              <p>Pods, containers, logs, stats, scans, and agent health live in different places.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">2</span>
+              <h3>Safety is easy to forget</h3>
+              <p>Uncapped memory, unlimited scaling, missing scans, and ad hoc shell access become invisible risks.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">3</span>
+              <h3>Small teams need guardrails</h3>
+              <p>People want simple operations without adopting a full Kubernetes platform.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">4</span>
+              <h3>Debugging wastes time</h3>
+              <p>When something breaks, the useful context is usually buried across commands and services.</p>
+            </article>
+          </div>
+          <div class="speaker-note">Talk track: Position PoDorel as a pragmatic operations layer, not a Kubernetes replacement.</div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide>
+        <div class="slide-inner">
+          <div class="content">
+            <span class="eyebrow">The product</span>
+            <h2>One console for the lifecycle of a local Podman host.</h2>
+            <p>PoDorel gives the operator a single place to understand what is running, what changed, what is safe, and what needs attention.</p>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card">
+              <span class="icon">A</span>
+              <h3>Operate pods</h3>
+              <p>Start, stop, restart, inspect containers, follow logs, and read current resource pressure.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">B</span>
+              <h3>Create from templates</h3>
+              <p>Launch common pods and Compose stacks with clearer defaults and fewer copy-paste mistakes.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">C</span>
+              <h3>See security posture</h3>
+              <p>Surface scanner state, image digest checks, host package updates, and audit events.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">D</span>
+              <h3>Respect Linux users</h3>
+              <p>A host agent speaks to the right rootless Podman session without turning everything into root.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">E</span>
+              <h3>Protect sessions</h3>
+              <p>HTTPS-ready configuration, passkeys, CSRF protection, and admin-gated sensitive actions.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">F</span>
+              <h3>Troubleshoot faster</h3>
+              <p>Diagnostics, correlation IDs, agent health layers, and support bundles reduce guesswork.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide>
+        <div class="slide-inner split">
+          <div class="content">
+            <span class="eyebrow">The workflow</span>
+            <h2>From "what is running?" to "ship the fix" in one place.</h2>
+            <p>PoDorel is built around the daily loop: observe, decide, act, verify, and leave a trace.</p>
+            <div class="cta-row">
+              <span class="tag">Live health</span>
+              <span class="tag">Lifecycle actions</span>
+              <span class="tag">Logs</span>
+              <span class="tag">Audit trail</span>
+            </div>
+          </div>
+          <div class="quote-panel">
+            <blockquote>"I do not want a bigger platform. I want my local containers to stop being mysterious."</blockquote>
+            <span>PoDorel turns that feeling into an operational surface.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide>
+        <div class="slide-inner">
+          <div class="content">
+            <span class="eyebrow">Architecture</span>
+            <h2>Small, understandable pieces with clear boundaries.</h2>
+            <p>A Go web service, a per-user agent, SQLite state, and an Angular UI. Nothing exotic, no cluster requirement, no hidden control plane.</p>
+          </div>
+          <div class="architecture-panel">
+            <div class="arch-row">
+              <article class="arch-box">
+                <strong>Browser UI</strong>
+                <span>Operate pods, templates, Compose stacks, logs, scans, settings, agents, and diagnostics.</span>
+              </article>
+              <article class="arch-box">
+                <strong>Go web/API</strong>
+                <span>Handles auth, settings, audit, SQLite state, health checks, and UI delivery.</span>
+              </article>
+              <article class="arch-box">
+                <strong>User agent</strong>
+                <span>Runs beside the Linux user and talks to rootless Podman socket or CLI.</span>
+              </article>
+            </div>
+            <div class="arch-row">
+              <article class="arch-box">
+                <strong>SQLite</strong>
+                <span>Simple local persistence for agents, sessions, audit logs, scans, templates, and settings.</span>
+              </article>
+              <article class="arch-box">
+                <strong>Podman pod</strong>
+                <span>The web service runs in a rootless Podman pod while the agent stays host-side.</span>
+              </article>
+              <article class="arch-box">
+                <strong>Local HTTPS</strong>
+                <span>Native TLS and local CA support keep browser security features available.</span>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide>
+        <div class="slide-inner">
+          <div class="content">
+            <span class="eyebrow">Why people care</span>
+            <h2>It gives small infrastructure a professional operating rhythm.</h2>
+          </div>
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span class="icon">01</span>
+              <strong>Less fear</strong>
+              <h3>Clear state</h3>
+              <p>Operators can see what is running and what needs attention without decoding a dozen commands.</p>
+            </article>
+            <article class="metric-card">
+              <span class="icon">02</span>
+              <strong>Less drift</strong>
+              <h3>Reusable templates</h3>
+              <p>Pods and Compose stacks become repeatable instead of living only in someone's shell history.</p>
+            </article>
+            <article class="metric-card">
+              <span class="icon">03</span>
+              <strong>Less risk</strong>
+              <h3>Visible guardrails</h3>
+              <p>Memory caps, scale warnings, scanner status, HTTPS, passkeys, and audit events stay visible.</p>
+            </article>
+          </div>
+          <div class="speaker-note">Talk track: Sell confidence and repeatability. The UI is the product, but the feeling is control.</div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide>
+        <div class="slide-inner">
+          <div class="content">
+            <span class="eyebrow">Best fit</span>
+            <h2>For teams and builders who want local-first operations without platform sprawl.</h2>
+          </div>
+          <div class="roadmap-grid">
+            <article class="feature-card">
+              <span class="icon">H</span>
+              <h3>Home labs</h3>
+              <p>A friendly way to run useful services without losing track of them.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">D</span>
+              <h3>Dev hosts</h3>
+              <p>Give developers a clean view of local service stacks and logs.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">S</span>
+              <h3>Small teams</h3>
+              <p>Run internal tools with auditability and safer defaults.</p>
+            </article>
+            <article class="feature-card">
+              <span class="icon">E</span>
+              <h3>Edge boxes</h3>
+              <p>Keep local services visible where a full cluster is too much.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-slide>
+        <div class="slide-inner">
+          <div class="closing-panel">
+            <img src="../ui/public/logo-mark.svg" alt="PoDorel logo">
+            <span class="eyebrow">The promise</span>
+            <h2>PoDorel makes local container operations feel intentional, visible, and safe.</h2>
+            <p>It is not trying to replace Kubernetes. It is giving rootless Podman the human-facing console it deserves.</p>
+            <div class="cta-row">
+              <span class="tag">Install locally</span>
+              <span class="tag">Register an agent</span>
+              <span class="tag">Deploy a template</span>
+              <span class="tag">Operate with confidence</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const slides = Array.from(document.querySelectorAll('[data-slide]'));
+      const progressBar = document.getElementById('progressBar');
+      const prevButton = document.getElementById('prevButton');
+      const nextButton = document.getElementById('nextButton');
+      let current = 0;
+
+      function render() {
+        slides.forEach((slide, index) => {
+          slide.classList.toggle('active', index === current);
+        });
+        progressBar.style.width = `${((current + 1) / slides.length) * 100}%`;
+        prevButton.disabled = current === 0;
+        nextButton.disabled = current === slides.length - 1;
+        document.title = `PoDorel Presentation (${current + 1}/${slides.length})`;
+      }
+
+      function go(delta) {
+        current = Math.max(0, Math.min(slides.length - 1, current + delta));
+        render();
+      }
+
+      prevButton.addEventListener('click', () => go(-1));
+      nextButton.addEventListener('click', () => go(1));
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'ArrowRight' || event.key === 'PageDown' || event.key === ' ') {
+          event.preventDefault();
+          go(1);
+        }
+        if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+          event.preventDefault();
+          go(-1);
+        }
+        if (event.key === 'Home') {
+          current = 0;
+          render();
+        }
+        if (event.key === 'End') {
+          current = slides.length - 1;
+          render();
+        }
+      });
+
+      render();
+    </script>
+  </body>
+</html>

@@ -9,6 +9,12 @@ PoDorel runs as two cooperating pieces: a Go web/API service in a rootless
 Podman pod, and a per-user host agent that talks to the user's rootless Podman
 socket or CLI. State is stored in SQLite. The UI is built with Angular Material.
 
+## Product Presentation
+
+Want the quick, attractive overview first? Open the
+[PoDorel presentation deck](docs/podorel-presentation.html) for a visual pitch
+covering the problem, product, architecture, and ideal users.
+
 ## For Users
 
 ### Supported Systems
