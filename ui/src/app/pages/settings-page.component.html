@@ -1,142 +1,347 @@
-<section class="page">
-  <header class="page-header">
+<section class="page settings-page">
+  <header class="page-header settings-header">
     <div class="page-title">
       <span class="eyebrow">System</span>
       <h1>Settings</h1>
-      <p>Authentication, logging, metrics, security scheduling, and automation controls.</p>
+      <p>Runtime controls, access posture, retention, and security schedule.</p>
     </div>
-    <button mat-stroked-button type="button" (click)="load()">
-      <mat-icon>refresh</mat-icon>
-      Refresh
-    </button>
+    <div class="settings-header-actions">
+      @if (hasUnsavedChanges) {
+        <span class="dirty-pill">
+          <mat-icon>edit</mat-icon>
+          Unsaved changes
+        </span>
+      }
+      <button mat-stroked-button type="button" [disabled]="settingsBusy" (click)="load(true)">
+        <mat-icon>{{ settingsBusy ? 'sync' : 'refresh' }}</mat-icon>
+        {{ settingsBusy ? 'Refreshing' : 'Refresh' }}
+      </button>
+    </div>
   </header>
 
   @if (accessedOverHttp) {
-    <mat-card class="warning-card">
-      <mat-card-content>
-        <mat-icon>warning</mat-icon>
-        HTTP access is enabled for v1. Use a trusted reverse proxy before exposing PoDorel outside a trusted LAN.
-      </mat-card-content>
-    </mat-card>
+    <section class="settings-alert warning">
+      <mat-icon>warning</mat-icon>
+      <div>
+        <strong>HTTP session</strong>
+        <span>Use HTTPS for passkeys and admin sessions.</span>
+      </div>
+    </section>
   }
 
   @if (error) {
-    <mat-card class="error-card">
-      <mat-card-content>{{ error }}</mat-card-content>
-    </mat-card>
+    <section class="settings-alert danger">
+      <mat-icon>error</mat-icon>
+      <div>
+        <strong>Settings error</strong>
+        <span>{{ error }}</span>
+      </div>
+    </section>
   }
 
-  <section class="hero-panel settings-hero">
-    <div>
-      <h2>{{ settings?.mode ?? 'runtime' }} settings</h2>
-      <p>Save changes with admin password confirmation. Sensitive actions remain behind the REST auth and CSRF flow.</p>
-    </div>
-    <mat-chip-set class="chip-row">
-      <mat-chip><mat-icon>terminal</mat-icon>Exec {{ execEnabled ? 'on' : 'off' }}</mat-chip>
-      <mat-chip><mat-icon>rule</mat-icon>Automation {{ automationEnabled ? 'on' : 'off' }}</mat-chip>
-      <mat-chip><mat-icon>security</mat-icon>Scans {{ scheduledScans ? 'scheduled' : 'manual' }}</mat-chip>
-    </mat-chip-set>
+  <section class="settings-overview" aria-label="Settings overview">
+    <article class="overview-tile">
+      <header>
+        <span><mat-icon>dns</mat-icon>Mode</span>
+      </header>
+      <strong>{{ runtimeMode }}</strong>
+      <small>{{ listenAddr }}</small>
+    </article>
+
+    <article class="overview-tile" [class.good]="httpsTone === 'good'" [class.warning]="httpsTone === 'warning'" [class.danger]="httpsTone === 'danger'">
+      <header>
+        <span><mat-icon>lock</mat-icon>HTTPS</span>
+      </header>
+      <strong>{{ httpsMode }}</strong>
+      <small>{{ httpsDetail }}</small>
+    </article>
+
+    <article class="overview-tile" [class.good]="passkeyTone === 'good'" [class.warning]="passkeyTone === 'warning'">
+      <header>
+        <span><mat-icon>fingerprint</mat-icon>Passkeys</span>
+      </header>
+      <strong>{{ passkeyCount }}</strong>
+      <small>{{ passkeyStatus }}</small>
+    </article>
+
+    <article class="overview-tile">
+      <header>
+        <span><mat-icon>toggle_on</mat-icon>Actions</span>
+      </header>
+      <strong>{{ execEnabled || automationEnabled ? 'enabled' : 'locked' }}</strong>
+      <small>{{ actionSummary }}</small>
+    </article>
   </section>
 
-  <div class="settings-grid">
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title><mat-icon>admin_panel_settings</mat-icon>Auth Settings</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>Session TTL: {{ settings?.auth?.session_ttl ?? 'unknown' }}</p>
-        <p>Failed login limit: {{ settings?.auth?.failed_login_limit ?? 'unknown' }}</p>
-        <p>Failed login window: {{ settings?.auth?.failed_login_window ?? 'unknown' }}</p>
-      </mat-card-content>
-    </mat-card>
+  <div class="settings-shell">
+    <main class="settings-main">
+      <section class="settings-section">
+        <header class="section-heading">
+          <span><mat-icon>admin_panel_settings</mat-icon>Access</span>
+        </header>
 
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title><mat-icon>terminal</mat-icon>Actions</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="toggle-stack">
-        <mat-slide-toggle [(ngModel)]="execEnabled">Exec shell</mat-slide-toggle>
-        <mat-slide-toggle [(ngModel)]="automationEnabled">Automation rules</mat-slide-toggle>
-      </mat-card-content>
-    </mat-card>
+        <div class="info-grid">
+          <div class="info-item wide">
+            <span>Public URL</span>
+            <strong>{{ publicURL }}</strong>
+          </div>
+          <div class="info-item">
+            <span>Listener</span>
+            <strong>{{ listenAddr }}</strong>
+          </div>
+          <div class="info-item">
+            <span>Proxy mode</span>
+            <strong>{{ proxyModeLabel }}</strong>
+          </div>
+          <div class="info-item">
+            <span>Session</span>
+            <strong>{{ currentSessionLabel }}</strong>
+          </div>
+          <div class="info-item">
+            <span>Session TTL</span>
+            <strong>{{ sessionTTLLabel }}</strong>
+          </div>
+          <div class="info-item">
+            <span>Failed logins</span>
+            <strong>{{ failedLoginLimitLabel }}</strong>
+          </div>
+          <div class="info-item">
+            <span>Lockout window</span>
+            <strong>{{ failedLoginWindowLabel }}</strong>
+          </div>
+        </div>
+      </section>
 
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title><mat-icon>monitoring</mat-icon>Metrics Retention</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <mat-form-field appearance="outline">
-          <mat-label>Hours</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="metricsRetentionHours">
-        </mat-form-field>
-      </mat-card-content>
-    </mat-card>
+      <section class="settings-section passkeys-section">
+        <header class="section-heading">
+          <span><mat-icon>fingerprint</mat-icon>Passkeys</span>
+          <span class="section-status" [class.good]="passkeyTone === 'good'" [class.warning]="passkeyTone === 'warning'">{{ passkeyStatus }}</span>
+        </header>
 
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title><mat-icon>article</mat-icon>Logs</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="form-grid">
-        <mat-form-field appearance="outline">
-          <mat-label>Retention hours</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="logsRetentionHours">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Per pod MB</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="logPerPodLimitMB">
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Total MB</mat-label>
-          <input matInput type="number" min="1" [(ngModel)]="logTotalLimitMB">
-        </mat-form-field>
-      </mat-card-content>
-    </mat-card>
+        @if (passkeyWarning) {
+          <div class="inline-message warning">
+            <mat-icon>warning</mat-icon>
+            <span>{{ passkeyWarning }}</span>
+          </div>
+        }
 
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title><mat-icon>security</mat-icon>Security Scan Schedule</mat-card-title>
-      </mat-card-header>
-      <mat-card-content class="form-grid">
-        <mat-slide-toggle [(ngModel)]="scheduledScans">Scheduled scans</mat-slide-toggle>
-        <mat-form-field appearance="outline">
-          <mat-label>Schedule</mat-label>
-          <input matInput [(ngModel)]="securitySchedule">
-        </mat-form-field>
-      </mat-card-content>
-    </mat-card>
+        <div class="passkey-enroll">
+          <mat-form-field appearance="outline">
+            <mat-label>Passkey name</mat-label>
+            <input matInput [(ngModel)]="passkeyName" autocomplete="off">
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="button" [disabled]="passkeyBusy" [matTooltip]="passkeyWarning || 'Register passkey'" (click)="registerPasskey()">
+            <mat-icon>add</mat-icon>
+            {{ passkeyBusy ? 'Registering' : 'Register' }}
+          </button>
+        </div>
 
-    <mat-card>
-      <mat-card-header>
-        <mat-card-title><mat-icon>vpn_key</mat-icon>Agent Tokens</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <p>Register and rotate agent-scoped login tokens from the Agents page.</p>
-      </mat-card-content>
-    </mat-card>
+        @if (passkeyError) {
+          <div class="inline-message danger">
+            <mat-icon>error</mat-icon>
+            <span>{{ passkeyError }}</span>
+          </div>
+        }
+        @if (passkeyResult) {
+          <div class="inline-message good">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ passkeyResult }}</span>
+          </div>
+        }
+
+        <div class="passkey-list">
+          @if (passkeyCount) {
+            @for (passkey of passkeyItems; track passkey.id) {
+              <article class="passkey-row">
+                <div class="passkey-row-main">
+                  <mat-icon>fingerprint</mat-icon>
+                  <div>
+                    <strong>{{ passkey.name }}</strong>
+                    <span>Created {{ passkey.created_at | date:'medium' }}</span>
+                    @if (passkey.last_used_at) {
+                      <span>Last used {{ passkey.last_used_at | date:'medium' }}</span>
+                    }
+                  </div>
+                </div>
+                <button mat-icon-button color="warn" type="button" matTooltip="Remove passkey" [disabled]="passkeyBusy" (click)="deletePasskey(passkey)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </article>
+            }
+          } @else {
+            <div class="empty-state">
+              <mat-icon>fingerprint</mat-icon>
+              <span>No passkeys registered.</span>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <header class="section-heading">
+          <span><mat-icon>rule</mat-icon>Operations</span>
+          <span class="section-status">{{ scanScheduleLabel }}</span>
+        </header>
+
+        <div class="control-grid">
+          <button class="control-row" type="button" role="switch" [attr.aria-checked]="execEnabled" [class.enabled]="execEnabled" (click)="toggleExec()">
+            <span>
+              <strong>Exec shell</strong>
+              <small>Container command access</small>
+            </span>
+            <span class="switch-indicator" aria-hidden="true"><span></span></span>
+          </button>
+
+          <button class="control-row" type="button" role="switch" [attr.aria-checked]="automationEnabled" [class.enabled]="automationEnabled" (click)="toggleAutomation()">
+            <span>
+              <strong>Automation rules</strong>
+              <small>Scheduled runtime actions</small>
+            </span>
+            <span class="switch-indicator" aria-hidden="true"><span></span></span>
+          </button>
+
+          <button class="control-row" type="button" role="switch" [attr.aria-checked]="scheduledScans" [class.enabled]="scheduledScans" (click)="toggleScheduledScans()">
+            <span>
+              <strong>Scheduled scans</strong>
+              <small>{{ scannerLabel }}</small>
+            </span>
+            <span class="switch-indicator" aria-hidden="true"><span></span></span>
+          </button>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Scan schedule</mat-label>
+            <input matInput [(ngModel)]="securitySchedule">
+          </mat-form-field>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <header class="section-heading">
+          <span><mat-icon>monitoring</mat-icon>Retention</span>
+          <span class="section-status">{{ logCapacityLabel }}</span>
+        </header>
+
+        <div class="retention-grid">
+          <article class="retention-card">
+            <header>
+              <span><mat-icon>query_stats</mat-icon>Metrics history</span>
+              <small>{{ metricsRetentionLabel }}</small>
+            </header>
+            <label class="number-control">
+              <span>Keep for</span>
+              <div>
+                <input type="number" min="1" [(ngModel)]="metricsRetentionHours" aria-label="Metrics retention hours">
+                <em>hours</em>
+              </div>
+            </label>
+            <p>{{ metricsSamplingLabel }}</p>
+          </article>
+
+          <article class="retention-card">
+            <header>
+              <span><mat-icon>article</mat-icon>Log storage</span>
+              <small>{{ logsRetentionLabel }}</small>
+            </header>
+            <div class="number-grid">
+              <label class="number-control">
+                <span>Keep for</span>
+                <div>
+                  <input type="number" min="1" [(ngModel)]="logsRetentionHours" aria-label="Log retention hours">
+                  <em>hours</em>
+                </div>
+              </label>
+              <label class="number-control">
+                <span>Per pod</span>
+                <div>
+                  <input type="number" min="1" [(ngModel)]="logPerPodLimitMB" aria-label="Log limit per pod in megabytes">
+                  <em>MB</em>
+                </div>
+              </label>
+              <label class="number-control">
+                <span>Total</span>
+                <div>
+                  <input type="number" min="1" [(ngModel)]="logTotalLimitMB" aria-label="Total log limit in megabytes">
+                  <em>MB</em>
+                </div>
+              </label>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="settings-section diagnostics-section">
+        <header class="section-heading">
+          <span><mat-icon>data_object</mat-icon>Diagnostics</span>
+        </header>
+
+        <details class="config-details" [open]="result !== ''">
+          <summary>
+            <span>Effective settings</span>
+            <mat-icon>expand_more</mat-icon>
+          </summary>
+          <pre>{{ result || (settings | json) }}</pre>
+        </details>
+      </section>
+    </main>
+
+    <aside class="settings-sidebar">
+      <section class="save-panel" [class.dirty]="hasUnsavedChanges">
+        <header class="section-heading">
+          <span><mat-icon>save</mat-icon>Save</span>
+          <span class="section-status" [class.warning]="hasUnsavedChanges" [class.good]="!hasUnsavedChanges && !settingsBusy">{{ saveStateLabel }}</span>
+        </header>
+
+        @if (hasUnsavedChanges) {
+          <div class="dirty-banner">
+            <mat-icon>edit</mat-icon>
+            <div>
+              <strong>Unsaved changes</strong>
+              <span>{{ saveStateDetail }}</span>
+            </div>
+          </div>
+        }
+
+        <mat-form-field appearance="outline">
+          <mat-label>Admin password</mat-label>
+          <input matInput type="password" [(ngModel)]="adminPassword" autocomplete="current-password">
+        </mat-form-field>
+
+        <button mat-flat-button color="primary" type="button" [disabled]="saving" (click)="save()">
+          <mat-icon>{{ saving ? 'sync' : 'save' }}</mat-icon>
+          {{ saving ? 'Saving' : 'Save changes' }}
+        </button>
+
+        @if (hasSaveFeedback) {
+          <div class="save-feedback" [class.warning]="requiresRestart || saveWarning">
+            <mat-icon>{{ requiresRestart ? 'restart_alt' : (saveWarning ? 'warning' : 'check_circle') }}</mat-icon>
+            <div>
+              @if (saveMessage) {
+                <strong>{{ saveMessage }}</strong>
+              }
+              @if (requiresRestart) {
+                <span>Restart required.</span>
+              }
+              @if (lastUpdatedKeys.length) {
+                <div class="updated-keys">
+                  @for (key of lastUpdatedKeys; track key) {
+                    <span>{{ key }}</span>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </section>
+
+      <section class="settings-section compact-section">
+        <header class="section-heading">
+          <span><mat-icon>vpn_key</mat-icon>Agent tokens</span>
+        </header>
+        <div class="info-item wide">
+          <span>Management</span>
+          <strong>Agents page</strong>
+        </div>
+      </section>
+    </aside>
   </div>
-
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title><mat-icon>save</mat-icon>Save Settings</mat-card-title>
-    </mat-card-header>
-    <mat-card-content class="form-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>Admin password confirmation</mat-label>
-        <input matInput type="password" [(ngModel)]="adminPassword">
-      </mat-form-field>
-      <button mat-flat-button color="primary" type="button" (click)="save()">
-        <mat-icon>save</mat-icon>
-        Save
-      </button>
-    </mat-card-content>
-  </mat-card>
-
-  <mat-card>
-    <mat-card-header>
-      <mat-card-title><mat-icon>data_object</mat-icon>Current Settings</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <pre>{{ result || (settings | json) }}</pre>
-    </mat-card-content>
-  </mat-card>
 </section>

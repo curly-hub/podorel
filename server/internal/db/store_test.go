@@ -120,6 +120,52 @@ func TestSessionAndCSRF(t *testing.T) {
 	}
 }
 
+func TestPasskeyCredentialLifecycle(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+	if err := store.Bootstrap(ctx, "secret-password"); err != nil {
+		t.Fatal(err)
+	}
+	user, err := store.FindUserByID(ctx, DefaultAdminUsername)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := store.SavePasskeyCredential(ctx, user.ID, "Laptop", "credential-id", `{"id":"credential-id"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ID == "" || created.CredentialJSON != `{"id":"credential-id"}` {
+		t.Fatalf("created credential = %#v", created)
+	}
+	credentials, err := store.ListPasskeyCredentials(ctx, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 1 || credentials[0].Name != "Laptop" {
+		t.Fatalf("credentials = %#v", credentials)
+	}
+	if err := store.UpdatePasskeyCredential(ctx, user.ID, "credential-id", `{"id":"credential-id","counter":1}`); err != nil {
+		t.Fatal(err)
+	}
+	credentials, err = store.ListPasskeyCredentials(ctx, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if credentials[0].CredentialJSON != `{"id":"credential-id","counter":1}` || credentials[0].LastUsedAt.IsZero() {
+		t.Fatalf("updated credential = %#v", credentials[0])
+	}
+	if err := store.DeletePasskeyCredential(ctx, user.ID, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	credentials, err = store.ListPasskeyCredentials(ctx, user.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 0 {
+		t.Fatalf("credentials after delete = %#v", credentials)
+	}
+}
+
 func TestAgentTokenShownOnceAndStoredHashed(t *testing.T) {
 	store := testStore(t)
 	if err := store.Bootstrap(context.Background(), "secret-password"); err != nil {

@@ -45,6 +45,9 @@ type App struct {
 
 	failMu   sync.Mutex
 	failures map[string][]time.Time
+
+	passkeyMu    sync.Mutex
+	passkeyFlows map[string]passkeyFlow
 }
 
 type Options struct {
@@ -117,6 +120,7 @@ func New(ctx context.Context, cfg config.Config, store *db.Store, logger *loggin
 		allowSnapshotFallback: opts.AllowSnapshotFallback && cfg.Mode.IsDevelopment(),
 		now:                   func() time.Time { return time.Now().UTC() },
 		failures:              map[string][]time.Time{},
+		passkeyFlows:          map[string]passkeyFlow{},
 	}
 	return app, nil
 }
@@ -132,6 +136,12 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/system/status", a.withSession(a.handleSystemStatus))
 	mux.HandleFunc("POST /api/auth/login", a.handlePasswordLogin)
 	mux.HandleFunc("POST /api/auth/login-agent-token", a.handleAgentTokenLogin)
+	mux.HandleFunc("POST /api/auth/passkeys/login/begin", a.handleBeginPasskeyLogin)
+	mux.HandleFunc("POST /api/auth/passkeys/login/finish", a.handleFinishPasskeyLogin)
+	mux.HandleFunc("GET /api/auth/passkeys", a.withSession(a.handleListPasskeys))
+	mux.HandleFunc("POST /api/auth/passkeys/register/begin", a.withSession(a.handleBeginPasskeyRegistration))
+	mux.HandleFunc("POST /api/auth/passkeys/register/finish", a.withSession(a.handleFinishPasskeyRegistration))
+	mux.HandleFunc("DELETE /api/auth/passkeys/{id}", a.withSession(a.handleDeletePasskey))
 	mux.HandleFunc("POST /api/auth/logout", a.withSession(a.handleLogout))
 	mux.HandleFunc("GET /api/auth/me", a.withSession(a.handleMe))
 
@@ -284,6 +294,7 @@ func (a *App) handleLogout(w http.ResponseWriter, r *http.Request, session db.Se
 		MaxAge:   -1,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		Secure:   a.secureSessionCookies(),
 	})
 	a.audit(r, session.UserID, "auth.logout", "session", session.ID, "success", nil)
 	api.WriteOK(r.Context(), w, map[string]any{"logged_out": true})

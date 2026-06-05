@@ -13,6 +13,8 @@ import {
   ImageDigest,
   LifecycleAction,
   LogHistory,
+  PasskeyBeginResponse,
+  PasskeyCredential,
   PodDetail,
   PodTemplate,
   PodView,
@@ -75,6 +77,32 @@ export class ApiService {
     const data = await this.post<{ csrf_token: string; scope: Record<string, unknown> }>('/api/auth/login-agent-token', { token }, false);
     this.csrfToken.set(data.csrf_token);
     this.currentUser.set({ session_type: 'agent_token', ...data.scope });
+  }
+
+  beginPasskeyLogin(): Promise<PasskeyBeginResponse> {
+    return this.post<PasskeyBeginResponse>('/api/auth/passkeys/login/begin', {}, false);
+  }
+
+  async finishPasskeyLogin(flowId: string, credential: unknown): Promise<void> {
+    const data = await this.post<{ csrf_token: string; user: CurrentUser }>(`/api/auth/passkeys/login/finish?flow_id=${encodeURIComponent(flowId)}`, credential, false);
+    this.csrfToken.set(data.csrf_token);
+    this.currentUser.set(data.user);
+  }
+
+  passkeys(): Promise<PasskeyCredential[]> {
+    return this.get<PasskeyCredential[]>('/api/auth/passkeys');
+  }
+
+  beginPasskeyRegistration(name: string): Promise<PasskeyBeginResponse> {
+    return this.post<PasskeyBeginResponse>('/api/auth/passkeys/register/begin', { name });
+  }
+
+  finishPasskeyRegistration(flowId: string, credential: unknown): Promise<PasskeyCredential> {
+    return this.post<PasskeyCredential>(`/api/auth/passkeys/register/finish?flow_id=${encodeURIComponent(flowId)}`, credential);
+  }
+
+  deletePasskey(id: string): Promise<Record<string, unknown>> {
+    return this.delete<Record<string, unknown>>(`/api/auth/passkeys/${encodeURIComponent(id)}`, {});
   }
 
   async logout(): Promise<void> {

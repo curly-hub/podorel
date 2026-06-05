@@ -31,6 +31,7 @@ type PodmanSocketRuntime struct {
 	HTTPClient *http.Client
 	Timeout    time.Duration
 	Logger     *logging.Logger
+	CPUTracker CPUTracker
 }
 
 func NewSocketRuntime(socketPath string, logger *logging.Logger) *PodmanSocketRuntime {
@@ -147,7 +148,11 @@ func (r *PodmanSocketRuntime) Stats(ctx context.Context) ([]ContainerStats, erro
 	if err != nil {
 		return nil, err
 	}
-	return ParseStatsJSON(raw, runtime.NumCPU())
+	stats, err := ParseStatsJSON(raw, runtime.NumCPU())
+	if err != nil {
+		return nil, err
+	}
+	return r.CPUTracker.Apply(stats, time.Now()), nil
 }
 
 func (r *PodmanSocketRuntime) StartPod(ctx context.Context, podID string) error {

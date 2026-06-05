@@ -78,6 +78,56 @@ func TestLoadEnvironmentListenOverridesModeDefault(t *testing.T) {
 	}
 }
 
+func TestLoadHTTPSEnvironment(t *testing.T) {
+	cfg, err := Load([]string{"--production"}, func(key string) string {
+		switch key {
+		case "PODOREL_ADMIN_PASSWORD":
+			return "secret-password"
+		case "PODOREL_PUBLIC_URL":
+			return "https://curly-hub.local:9095"
+		case "PODOREL_TLS_CERT_FILE":
+			return "/app/data/tls/curly-hub.local.crt"
+		case "PODOREL_TLS_KEY_FILE":
+			return "/app/data/tls/curly-hub.local.key"
+		case "PODOREL_TRUSTED_PROXY_MODE":
+			return "true"
+		default:
+			return ""
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Server.TLSEnabled() || !cfg.Server.UsesHTTPS() {
+		t.Fatalf("server TLS state = %#v", cfg.Server)
+	}
+	if !cfg.Server.TrustedProxyMode {
+		t.Fatal("trusted proxy mode was not enabled")
+	}
+	if cfg.Server.TLSCertFile != "/app/data/tls/curly-hub.local.crt" || cfg.Server.TLSKeyFile != "/app/data/tls/curly-hub.local.key" {
+		t.Fatalf("tls files = %#v", cfg.Server)
+	}
+}
+
+func TestLoadRejectsPartialTLSConfig(t *testing.T) {
+	_, err := Load([]string{"--tls-cert-file", "/tmp/cert.pem"}, func(string) string { return "" })
+	if err == nil {
+		t.Fatal("expected partial TLS config to fail")
+	}
+}
+
+func TestLoadRejectsInvalidTrustedProxyMode(t *testing.T) {
+	_, err := Load(nil, func(key string) string {
+		if key == "PODOREL_TRUSTED_PROXY_MODE" {
+			return "maybe"
+		}
+		return ""
+	})
+	if err == nil {
+		t.Fatal("expected invalid trusted proxy mode to fail")
+	}
+}
+
 func TestLoadUsesAgentSocketEnvironment(t *testing.T) {
 	cfg, err := Load([]string{"--development"}, func(key string) string {
 		if key == "PODOREL_AGENT_SOCKET" {

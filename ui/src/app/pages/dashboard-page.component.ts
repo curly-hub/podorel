@@ -21,7 +21,7 @@ export class DashboardPageComponent implements OnInit {
   readonly helpTopics = {
     page: 'Dashboard summarizes live pod, agent, security, and audit state from the backend APIs.',
     pods: 'Pods counted from the agent snapshot. Actions still require the selected agent to be online.',
-    cpu: 'CPU is summed from current Podman stats samples and expressed as a percent of total host CPU capacity.',
+    cpu: 'CPU is summed from live Podman cpu_time deltas, so it reflects current activity instead of Podman average CPU.',
     memory: 'Memory is summed from current Podman stats samples for visible containers.',
     security: 'Security status comes from the scanner, digest, and host package checks.',
     agents: 'Agents are local processes that connect PoDorel to rootless Podman for a Linux user.',

@@ -1,9 +1,19 @@
-<section class="page">
+<section class="page create-page">
   <header class="page-header">
     <div class="page-title">
       <span class="eyebrow">Build</span>
       <h1>Create Pod</h1>
-      <p>Provision from templates, preview Dockerfile imports, or register secret metadata.</p>
+      <p>Preview, deploy, and register runtime inputs from one controlled workspace.</p>
+    </div>
+    <div class="header-actions">
+      <button mat-stroked-button type="button" routerLink="/templates">
+        <mat-icon>view_module</mat-icon>
+        Templates
+      </button>
+      <button mat-stroked-button type="button" (click)="loadTemplates()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
     </div>
   </header>
 
@@ -15,189 +25,493 @@
 
   <section class="hero-panel create-hero">
     <div>
-      <h2>{{ selectedTemplate?.name ?? 'Choose a template' }}</h2>
-      <p>{{ selectedTemplate?.description ?? 'Built-in pod templates load from the PoDorel API.' }}</p>
+      <h2>{{ modeTitle }}</h2>
+      <p>{{ selectedTemplate?.name ?? selectedComposeStack?.name ?? imageName }}</p>
     </div>
     <mat-chip-set class="chip-row">
       <mat-chip><mat-icon>view_module</mat-icon>{{ templates.length }} templates</mat-chip>
-      <mat-chip><mat-icon>dynamic_feed</mat-icon>{{ composeStacks.length }} compose stacks</mat-chip>
-      <mat-chip><mat-icon>apps</mat-icon>{{ podName }}</mat-chip>
-      <mat-chip><mat-icon>dns</mat-icon>{{ agentId || 'default agent' }}</mat-chip>
+      <mat-chip><mat-icon>dynamic_feed</mat-icon>{{ composeStacks.length }} stacks</mat-chip>
+      <mat-chip><mat-icon>dns</mat-icon>{{ agentId || 'primary' }}</mat-chip>
+      <mat-chip><mat-icon>{{ executing ? 'sync' : 'task_alt' }}</mat-icon>{{ executing ? 'running' : resultStatus() }}</mat-chip>
     </mat-chip-set>
   </section>
 
-  <mat-card>
-    <mat-stepper>
-      <mat-step label="Template">
-        <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Template</mat-label>
-            <mat-select [(ngModel)]="templateId">
-              @for (template of templates; track template.id) {
-                <mat-option [value]="template.id">{{ template.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Pod name</mat-label>
-            <input matInput [(ngModel)]="podName">
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Agent ID</mat-label>
-            <input matInput placeholder="primary" [(ngModel)]="agentId">
-          </mat-form-field>
-        </div>
-        <mat-form-field appearance="outline" class="wide-field">
-          <mat-label>Template values JSON</mat-label>
-          <textarea matInput rows="3" [(ngModel)]="templateValuesText"></textarea>
-        </mat-form-field>
+  <div class="create-workspace">
+    <nav class="mode-rail" aria-label="Deployment path">
+      <button type="button" [class.active]="mode === 'template'" (click)="selectMode('template')">
+        <mat-icon>view_module</mat-icon>
+        <span>
+          <strong>Template</strong>
+          <small>Known images and defaults</small>
+        </span>
+      </button>
+      <button type="button" [class.active]="mode === 'compose'" (click)="selectMode('compose')">
+        <mat-icon>dynamic_feed</mat-icon>
+        <span>
+          <strong>Compose</strong>
+          <small>Multi-service bundle</small>
+        </span>
+      </button>
+      <button type="button" [class.active]="mode === 'image'" (click)="selectMode('image')">
+        <mat-icon>build</mat-icon>
+        <span>
+          <strong>Image</strong>
+          <small>Build from Dockerfile</small>
+        </span>
+      </button>
+      <button type="button" [class.active]="mode === 'secret'" (click)="selectMode('secret')">
+        <mat-icon>key</mat-icon>
+        <span>
+          <strong>Secret</strong>
+          <small>Register Podman secret</small>
+        </span>
+      </button>
+    </nav>
 
-        @if (selectedTemplate; as template) {
-          <section class="template-preview">
-            <header>
+    <main class="builder-panel">
+      @switch (mode) {
+        @case ('template') {
+          <section class="builder-section">
+            <header class="builder-heading">
               <div>
-                <h2>{{ template.name }}</h2>
-                <span>{{ template.image }}</span>
+                <span>Template Deploy</span>
+                <h2>Choose a known service</h2>
               </div>
+              <button mat-stroked-button type="button" routerLink="/templates">
+                <mat-icon>inventory_2</mat-icon>
+                Catalog
+              </button>
             </header>
-            <p>{{ template.description }}</p>
-            <mat-chip-set class="chip-row">
-              <mat-chip><mat-icon>restart_alt</mat-icon>{{ template.restart_policy }}</mat-chip>
-              <mat-chip><mat-icon>speed</mat-icon>{{ template.resource_limits.cpu || 'CPU default' }}</mat-chip>
-              <mat-chip><mat-icon>memory</mat-icon>{{ template.resource_limits.memory || 'Memory default' }}</mat-chip>
-            </mat-chip-set>
+
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Template</mat-label>
+                <mat-select [ngModel]="templateId" (ngModelChange)="selectTemplate($event, true)">
+                  @for (template of templates; track template.id) {
+                    <mat-option [value]="template.id">{{ template.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Pod name</mat-label>
+                <input matInput [(ngModel)]="podName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Target agent</mat-label>
+                <mat-select [(ngModel)]="agentId">
+                  <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
+                  @for (agent of agents; track agent.id) {
+                    <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>{{ agentHint() }}</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Find template</mat-label>
+              <input matInput [(ngModel)]="templateSearch" placeholder="node, redis, nginx, postgres">
+            </mat-form-field>
+
+            <div class="template-options">
+              @for (template of filteredTemplates(); track template.id) {
+                <button type="button" class="template-option" [class.selected]="template.id === templateId" (click)="selectTemplate(template.id, true)">
+                  <span class="option-top">
+                    <mat-icon>{{ template.id === templateId ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                    <strong>{{ template.name }}</strong>
+                  </span>
+                  <small>{{ template.image }}</small>
+                  <span>{{ template.description }}</span>
+                </button>
+              }
+            </div>
+
+            @if (selectedTemplate; as template) {
+              <section class="template-detail">
+                <header>
+                  <div>
+                    <h3>{{ template.name }}</h3>
+                    <span>{{ template.id }} · {{ template.version }}</span>
+                  </div>
+                  <mat-chip-set class="chip-row">
+                    <mat-chip><mat-icon>restart_alt</mat-icon>{{ template.restart_policy }}</mat-chip>
+                    <mat-chip><mat-icon>speed</mat-icon>{{ template.resource_limits.cpu || 'CPU default' }}</mat-chip>
+                    <mat-chip><mat-icon>memory</mat-icon>{{ template.resource_limits.memory || 'Memory default' }}</mat-chip>
+                  </mat-chip-set>
+                </header>
+
+                <dl class="detail-grid">
+                  <div>
+                    <dt>Image</dt>
+                    <dd>{{ template.image }}</dd>
+                  </div>
+                  <div>
+                    <dt>Command</dt>
+                    <dd>{{ commandLabel(template.command) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Ports</dt>
+                    <dd>{{ portsLabel(template) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Values</dt>
+                    <dd>{{ templateValueCount() }} override{{ templateValueCount() === 1 ? '' : 's' }}</dd>
+                  </div>
+                </dl>
+
+                @if (template.ports.length) {
+                  <section class="field-band">
+                    <header>
+                      <mat-icon>settings_ethernet</mat-icon>
+                      <strong>Port mapping</strong>
+                    </header>
+                    <div class="form-grid compact">
+                      @for (port of template.ports; track port.container + '-' + port.protocol) {
+                        <mat-form-field appearance="outline">
+                          <mat-label>Host port for {{ port.container }}/{{ port.protocol }}</mat-label>
+                          <input matInput type="number" min="0" max="65535" [ngModel]="templatePortValue(port)" (ngModelChange)="setTemplatePortValue(port, $event)">
+                        </mat-form-field>
+                      }
+                    </div>
+                  </section>
+                }
+
+                @if (templateVariables().length) {
+                  <section class="field-band">
+                    <header>
+                      <mat-icon>tune</mat-icon>
+                      <strong>Template values</strong>
+                    </header>
+                    <div class="form-grid compact">
+                      @for (key of templateVariables(); track key) {
+                        <mat-form-field appearance="outline">
+                          <mat-label>{{ key }}</mat-label>
+                          <input matInput [ngModel]="templateVariableValue(key)" (ngModelChange)="setTemplateVariableValue(key, $event)">
+                        </mat-form-field>
+                      }
+                    </div>
+                  </section>
+                }
+
+                <section class="field-band">
+                  <header>
+                    <mat-icon>add_circle</mat-icon>
+                    <strong>Extra values</strong>
+                    <button mat-stroked-button type="button" (click)="addTemplateValueRow()">
+                      <mat-icon>add</mat-icon>
+                      Add
+                    </button>
+                  </header>
+                  @if (templateValueRows.length) {
+                    <div class="value-rows">
+                      @for (row of templateValueRows; track $index; let i = $index) {
+                        <mat-form-field appearance="outline">
+                          <mat-label>Key</mat-label>
+                          <input matInput [(ngModel)]="row.key">
+                        </mat-form-field>
+                        <mat-form-field appearance="outline">
+                          <mat-label>Value</mat-label>
+                          <input matInput [(ngModel)]="row.value">
+                        </mat-form-field>
+                        <button mat-icon-button type="button" aria-label="Remove value" matTooltip="Remove value" (click)="removeTemplateValueRow(i)">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      }
+                    </div>
+                  } @else {
+                    <p class="empty-inline">No extra values.</p>
+                  }
+                </section>
+
+                @if (template.ui_notes.length) {
+                  <ul class="note-list">
+                    @for (note of template.ui_notes; track note) {
+                      <li>{{ note }}</li>
+                    }
+                  </ul>
+                }
+              </section>
+            }
+
+            <div class="action-bar">
+              <button mat-stroked-button type="button" (click)="preview()" [disabled]="executing || !selectedTemplate">
+                <mat-icon>visibility</mat-icon>
+                Preview
+              </button>
+              <button mat-flat-button color="primary" type="button" (click)="create()" [disabled]="executing || !selectedTemplate">
+                <mat-icon>rocket_launch</mat-icon>
+                Create Pod
+              </button>
+            </div>
           </section>
         }
 
-        <div class="actions">
-          <button mat-stroked-button type="button" (click)="preview()"><mat-icon>visibility</mat-icon>Preview</button>
-          <button mat-flat-button color="primary" type="button" (click)="create()"><mat-icon>add</mat-icon>Create</button>
-        </div>
-      </mat-step>
-
-      <mat-step label="Compose">
-        <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Compose stack</mat-label>
-            <mat-select [(ngModel)]="composeStackId" (selectionChange)="composeProjectName = $event.value">
-              @for (stack of composeStacks; track stack.id) {
-                <mat-option [value]="stack.id">{{ stack.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Project name</mat-label>
-            <input matInput [(ngModel)]="composeProjectName">
-          </mat-form-field>
-        </div>
-
-        @if (selectedComposeStack; as stack) {
-          <section class="template-preview">
-            <header>
+        @case ('compose') {
+          <section class="builder-section">
+            <header class="builder-heading">
               <div>
-                <h2>{{ stack.name }}</h2>
-                <span>{{ stack.source_path }}</span>
+                <span>Compose Deploy</span>
+                <h2>Deploy a service bundle</h2>
               </div>
+              <button mat-stroked-button type="button" routerLink="/templates">
+                <mat-icon>dynamic_feed</mat-icon>
+                Stacks
+              </button>
             </header>
-            <p>{{ stack.description }}</p>
-            <mat-chip-set class="chip-row">
-              @for (composeFile of stack.compose_files; track composeFile) {
-                <mat-chip><mat-icon>description</mat-icon>{{ composeFile }}</mat-chip>
+
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Compose stack</mat-label>
+                <mat-select [ngModel]="composeStackId" (ngModelChange)="selectComposeStack($event)">
+                  @for (stack of composeStacks; track stack.id) {
+                    <mat-option [value]="stack.id">{{ stack.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Project name</mat-label>
+                <input matInput [(ngModel)]="composeProjectName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Target agent</mat-label>
+                <mat-select [(ngModel)]="agentId">
+                  <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
+                  @for (agent of agents; track agent.id) {
+                    <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>{{ agentHint() }}</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Find stack</mat-label>
+              <input matInput [(ngModel)]="composeSearch" placeholder="web, database, imported">
+            </mat-form-field>
+
+            <div class="template-options stack-options">
+              @for (stack of filteredComposeStacks(); track stack.id) {
+                <button type="button" class="template-option" [class.selected]="stack.id === composeStackId" (click)="selectComposeStack(stack.id)">
+                  <span class="option-top">
+                    <mat-icon>{{ stack.id === composeStackId ? 'radio_button_checked' : 'radio_button_unchecked' }}</mat-icon>
+                    <strong>{{ stack.name }}</strong>
+                  </span>
+                  <small>{{ stack.source_path }}</small>
+                  <span>{{ stack.description }}</span>
+                </button>
               }
-              @for (service of stack.services; track service.name) {
-                <mat-chip><mat-icon>deployed_code</mat-icon>{{ service.name }}</mat-chip>
-              }
-            </mat-chip-set>
-            <ul>
-              @for (note of stack.notes; track note) {
-                <li>{{ note }}</li>
-              }
-            </ul>
+            </div>
+
+            @if (selectedComposeStack; as stack) {
+              <section class="template-detail">
+                <header>
+                  <div>
+                    <h3>{{ stack.name }}</h3>
+                    <span>{{ stack.id }} · {{ stack.version }}</span>
+                  </div>
+                  <mat-chip-set class="chip-row">
+                    @for (composeFile of stack.compose_files; track composeFile) {
+                      <mat-chip><mat-icon>description</mat-icon>{{ composeFile }}</mat-chip>
+                    }
+                  </mat-chip-set>
+                </header>
+                <dl class="detail-grid">
+                  <div>
+                    <dt>Services</dt>
+                    <dd>{{ composeServiceLabel(stack) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{{ stack.source_path }}</dd>
+                  </div>
+                </dl>
+                @if (stack.notes.length) {
+                  <ul class="note-list">
+                    @for (note of stack.notes; track note) {
+                      <li>{{ note }}</li>
+                    }
+                  </ul>
+                }
+              </section>
+            }
+
+            <div class="action-bar">
+              <button mat-stroked-button type="button" (click)="composePreview()" [disabled]="executing || !selectedComposeStack">
+                <mat-icon>visibility</mat-icon>
+                Preview Stack
+              </button>
+              <button mat-flat-button color="primary" type="button" (click)="composeDeploy()" [disabled]="executing || !selectedComposeStack">
+                <mat-icon>publish</mat-icon>
+                Deploy Stack
+              </button>
+            </div>
           </section>
         }
 
-        <div class="actions">
-          <button mat-stroked-button type="button" (click)="composePreview()"><mat-icon>visibility</mat-icon>Preview Stack</button>
-          <button mat-flat-button color="primary" type="button" (click)="composeDeploy()"><mat-icon>publish</mat-icon>Deploy Stack</button>
-        </div>
-      </mat-step>
+        @case ('image') {
+          <section class="builder-section">
+            <header class="builder-heading">
+              <div>
+                <span>Image Build</span>
+                <h2>Build from Dockerfile</h2>
+              </div>
+            </header>
 
-      <mat-step label="Advanced">
-        <mat-chip-set class="chip-row">
-          @for (port of selectedTemplate?.ports ?? []; track port.host + '-' + port.container) {
-            <mat-chip><mat-icon>settings_ethernet</mat-icon>{{ port.host }}:{{ port.container }}/{{ port.protocol }}</mat-chip>
-          } @empty {
-            <mat-chip><mat-icon>block</mat-icon>No declared ports</mat-chip>
-          }
-          @for (secret of selectedTemplate?.secrets ?? []; track secret.name) {
-            <mat-chip><mat-icon>key</mat-icon>{{ secret.name }} {{ secret.required ? 'required' : 'optional' }}</mat-chip>
-          }
-        </mat-chip-set>
-        <mat-divider></mat-divider>
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Image name</mat-label>
+                <input matInput [(ngModel)]="imageName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Target agent</mat-label>
+                <mat-select [(ngModel)]="agentId">
+                  <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
+                  @for (agent of agents; track agent.id) {
+                    <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>{{ agentHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Password confirmation</mat-label>
+                <input matInput type="password" [(ngModel)]="buildPassword">
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="wide-field code-field">
+              <mat-label>Dockerfile</mat-label>
+              <textarea matInput rows="14" [(ngModel)]="dockerfile"></textarea>
+            </mat-form-field>
+            <div class="action-bar">
+              <button mat-stroked-button type="button" (click)="buildPreview()" [disabled]="executing">
+                <mat-icon>visibility</mat-icon>
+                Preview Build
+              </button>
+              <button mat-flat-button color="primary" type="button" (click)="buildConfirm()" [disabled]="executing || !buildPassword">
+                <mat-icon>build</mat-icon>
+                Build Image
+              </button>
+            </div>
+          </section>
+        }
+
+        @case ('secret') {
+          <section class="builder-section">
+            <header class="builder-heading">
+              <div>
+                <span>Secret Input</span>
+                <h2>Register a Podman secret</h2>
+              </div>
+            </header>
+
+            @if (accessedOverHttp) {
+              <div class="warning">
+                <mat-icon>warning</mat-icon>
+                <span>HTTP session detected. Use a trusted reverse proxy before entering production secrets.</span>
+              </div>
+            }
+
+            <div class="form-grid">
+              <mat-form-field appearance="outline">
+                <mat-label>Secret name</mat-label>
+                <input matInput [(ngModel)]="secretName">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Used by pod ID</mat-label>
+                <input matInput [(ngModel)]="secretPodId">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Target agent</mat-label>
+                <mat-select [(ngModel)]="agentId">
+                  <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
+                  @for (agent of agents; track agent.id) {
+                    <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>{{ agentHint() }}</mat-hint>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Password confirmation</mat-label>
+                <input matInput type="password" [(ngModel)]="secretPassword">
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="wide-field code-field">
+              <mat-label>Secret value</mat-label>
+              <textarea matInput rows="5" [(ngModel)]="secretValue"></textarea>
+            </mat-form-field>
+            <div class="action-bar">
+              <button mat-flat-button color="primary" type="button" (click)="createSecret()" [disabled]="executing || !secretName || !secretValue || !secretPassword">
+                <mat-icon>key</mat-icon>
+                Create Secret
+              </button>
+            </div>
+          </section>
+        }
+      }
+    </main>
+
+    <aside class="review-panel">
+      <section>
+        <header class="panel-heading">
+          <span><mat-icon>fact_check</mat-icon>Review</span>
+        </header>
+        <dl class="review-list">
+          <div>
+            <dt>Path</dt>
+            <dd>{{ modeTitle }}</dd>
+          </div>
+          <div>
+            <dt>Target</dt>
+            <dd>{{ podName || composeProjectName || imageName || secretName || 'not set' }}</dd>
+          </div>
+          <div>
+            <dt>Target agent</dt>
+            <dd>{{ selectedAgentLabel() }}</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>{{ executing ? 'running' : resultStatus() }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="guardrail-box">
+        <header>
+          <mat-icon>rule</mat-icon>
+          <strong>Guardrails</strong>
+        </header>
         <ul>
-          @for (note of selectedTemplate?.ui_notes ?? []; track note) {
-            <li>{{ note }}</li>
-          }
+          <li>Preview before create or deploy.</li>
+          <li>Set memory limits in templates.</li>
+          <li>Use explicit project and pod names.</li>
         </ul>
-      </mat-step>
+      </section>
 
-      <mat-step label="Dockerfile">
-        <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Image</mat-label>
-            <input matInput [(ngModel)]="imageName">
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Password confirmation</mat-label>
-            <input matInput type="password" [(ngModel)]="buildPassword">
-          </mat-form-field>
-        </div>
-        <mat-form-field appearance="outline" class="wide-field">
-          <mat-label>Dockerfile</mat-label>
-          <textarea matInput rows="10" [(ngModel)]="dockerfile"></textarea>
-        </mat-form-field>
-        <div class="actions">
-          <button mat-stroked-button type="button" (click)="buildPreview()"><mat-icon>visibility</mat-icon>Preview Build</button>
-          <button mat-flat-button color="primary" type="button" (click)="buildConfirm()"><mat-icon>build</mat-icon>Build</button>
-        </div>
-      </mat-step>
-
-      <mat-step label="Secrets">
-        @if (accessedOverHttp) {
-          <div class="warning">
-            <mat-icon>warning</mat-icon>
-            <span>This HTTP-only v1 session should be protected by a trusted reverse proxy before entering production secrets.</span>
+      <section class="result-box">
+        <header class="panel-heading">
+          <span><mat-icon>terminal</mat-icon>{{ resultTitle }}</span>
+        </header>
+        @if (buildStreamStatus) {
+          <div class="stream-status">
+            <mat-icon>online_prediction</mat-icon>
+            <span>{{ buildStreamStatus }}</span>
           </div>
         }
-        <div class="form-grid">
-          <mat-form-field appearance="outline">
-            <mat-label>Secret name</mat-label>
-            <input matInput [(ngModel)]="secretName">
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Used by pod ID</mat-label>
-            <input matInput [(ngModel)]="secretPodId">
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Password confirmation</mat-label>
-            <input matInput type="password" [(ngModel)]="secretPassword">
-          </mat-form-field>
-        </div>
-        <mat-form-field appearance="outline" class="wide-field">
-          <mat-label>Secret value</mat-label>
-          <textarea matInput rows="4" [(ngModel)]="secretValue"></textarea>
-        </mat-form-field>
-        <button mat-flat-button color="primary" type="button" (click)="createSecret()"><mat-icon>key</mat-icon>Create Secret Metadata</button>
-      </mat-step>
-
-      <mat-step label="Result">
-        @if (buildStreamStatus) {
-          <mat-chip-set class="chip-row">
-            <mat-chip><mat-icon>terminal</mat-icon>{{ buildStreamStatus }}</mat-chip>
-          </mat-chip-set>
+        @if (previewCommand().length) {
+          <div class="command-preview">
+            <strong>Command preview</strong>
+            <code>{{ previewCommand().join(' ') }}</code>
+          </div>
         }
-        <pre>{{ result || 'No preview or action result yet.' }}</pre>
-      </mat-step>
-    </mat-stepper>
-  </mat-card>
+        @if (result) {
+          <pre>{{ result }}</pre>
+        } @else {
+          <div class="result-empty" [class.error]="!!error" [class.busy]="executing">
+            <mat-icon>{{ error ? 'error' : executing ? 'hourglass_top' : 'terminal' }}</mat-icon>
+            <strong>{{ emptyResultTitle() }}</strong>
+            <span>{{ emptyResultMessage() }}</span>
+          </div>
+        }
+      </section>
+    </aside>
+  </div>
 </section>

@@ -57,6 +57,8 @@ type ServerConfig struct {
 	ListenAddr       string `json:"listen_addr"`
 	PublicURL        string `json:"public_url"`
 	TrustedProxyMode bool   `json:"trusted_proxy_mode"`
+	TLSCertFile      string `json:"tls_cert_file"`
+	TLSKeyFile       string `json:"tls_key_file"`
 }
 
 type AgentConfig struct {
@@ -96,11 +98,18 @@ type ActionsConfig struct {
 type getenvFunc func(string) string
 
 func Load(args []string, getenv getenvFunc) (Config, error) {
+	trustedProxyModeDefault, err := envBoolOrDefault(getenv, "PODOREL_TRUSTED_PROXY_MODE", false)
+	if err != nil {
+		return Config{}, err
+	}
 	fs := flag.NewFlagSet("podorel-web", flag.ContinueOnError)
 	development := fs.Bool("development", false, "run in development mode")
 	production := fs.Bool("production", false, "run in production mode")
 	listenAddr := fs.String("listen-addr", envOrDefault(getenv, "PODOREL_LISTEN_ADDR", ""), "HTTP listen address")
 	publicURL := fs.String("public-url", envOrDefault(getenv, "PODOREL_PUBLIC_URL", ""), "public URL")
+	trustedProxyMode := fs.Bool("trusted-proxy-mode", trustedProxyModeDefault, "trust X-Forwarded-Proto and X-Forwarded-Host headers")
+	tlsCertFile := fs.String("tls-cert-file", envOrDefault(getenv, "PODOREL_TLS_CERT_FILE", ""), "TLS certificate file for native HTTPS")
+	tlsKeyFile := fs.String("tls-key-file", envOrDefault(getenv, "PODOREL_TLS_KEY_FILE", ""), "TLS private key file for native HTTPS")
 	dbPath := fs.String("db-path", expandHome(envOrDefault(getenv, "PODOREL_DB_PATH", DefaultDatabasePath)), "SQLite database path")
 	uiDistPath := fs.String("ui-dist-path", envOrDefault(getenv, "PODOREL_UI_DIST_PATH", DefaultUIDistPath), "Angular distribution path")
 	if err := fs.Parse(args); err != nil {
@@ -123,7 +132,9 @@ func Load(args []string, getenv getenvFunc) (Config, error) {
 		Server: ServerConfig{
 			ListenAddr:       *listenAddr,
 			PublicURL:        *publicURL,
-			TrustedProxyMode: false,
+			TrustedProxyMode: *trustedProxyMode,
+			TLSCertFile:      *tlsCertFile,
+			TLSKeyFile:       *tlsKeyFile,
 		},
 		Agent: AgentConfig{
 			PrimarySocketPath: defaultAgentSocketPath(getenv),
@@ -163,7 +174,18 @@ func Load(args []string, getenv getenvFunc) (Config, error) {
 	if cfg.Server.ListenAddr == "" {
 		return Config{}, fmt.Errorf("listen address cannot be empty")
 	}
+	if (cfg.Server.TLSCertFile == "") != (cfg.Server.TLSKeyFile == "") {
+		return Config{}, fmt.Errorf("tls cert file and tls key file must be configured together")
+	}
 	return cfg, nil
+}
+
+func (s ServerConfig) TLSEnabled() bool {
+	return s.TLSCertFile != "" && s.TLSKeyFile != ""
+}
+
+func (s ServerConfig) UsesHTTPS() bool {
+	return s.TLSEnabled() || strings.HasPrefix(strings.ToLower(strings.TrimSpace(s.PublicURL)), "https://")
 }
 
 func defaultListenAddrForMode(mode podorelruntime.Mode) string {
@@ -195,6 +217,21 @@ func envOrDefault(getenv getenvFunc, key string, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func envBoolOrDefault(getenv getenvFunc, key string, fallback bool) (bool, error) {
+	value := strings.ToLower(strings.TrimSpace(getenv(key)))
+	if value == "" {
+		return fallback, nil
+	}
+	switch value {
+	case "1", "t", "true", "y", "yes", "on":
+		return true, nil
+	case "0", "f", "false", "n", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be a boolean", key)
+	}
 }
 
 func expandHome(path string) string {

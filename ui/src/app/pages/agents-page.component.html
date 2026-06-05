@@ -3,195 +3,282 @@
     <div class="page-title">
       <span class="eyebrow">Agents</span>
       <h1>Agents <app-help-tooltip [text]="helpTopics.page" label="Agents help"></app-help-tooltip></h1>
-      <p>Local user agents, socket health, and one-time scoped login tokens.</p>
+      <p>Local user agents, rootless Podman access, and scoped connection health.</p>
     </div>
     <div class="header-actions">
       @if (lastRefreshedAt(); as refreshed) {
         <span class="refresh-stamp">Updated {{ refreshed | date: 'mediumTime' }}</span>
       }
       <button mat-stroked-button type="button" (click)="refresh()" [disabled]="refreshing()">
-        <mat-icon>refresh</mat-icon>
-        Refresh
+        <mat-icon>{{ refreshing() ? 'sync' : 'refresh' }}</mat-icon>
+        {{ refreshing() ? 'Refreshing' : 'Refresh' }}
       </button>
     </div>
   </header>
 
   @if (refreshing()) {
-    <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    <mat-progress-bar class="refresh-bar" mode="indeterminate"></mat-progress-bar>
   }
 
   @if (error) {
-    <mat-card class="error-card">
-      <mat-card-content>{{ error }}</mat-card-content>
-    </mat-card>
+    <section class="agent-alert danger">
+      <mat-icon>error</mat-icon>
+      <div>
+        <strong>Agent request failed</strong>
+        <span>{{ error }}</span>
+      </div>
+    </section>
   }
 
   @if (token) {
-    <mat-card class="token-card">
-      <mat-card-header>
-        <mat-card-title><mat-icon>vpn_key</mat-icon>New Agent Token <app-help-tooltip [text]="helpTopics.token" label="Agent token help"></app-help-tooltip></mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
+    <section class="token-banner">
+      <mat-icon>vpn_key</mat-icon>
+      <div>
+        <strong>New agent token</strong>
         <code>{{ token }}</code>
-      </mat-card-content>
-    </mat-card>
+      </div>
+      <button mat-stroked-button type="button" (click)="copyCommand(token)">
+        <mat-icon>content_copy</mat-icon>
+        Copy
+      </button>
+    </section>
   }
 
   @if (devSupervisorWarning()) {
-    <mat-card class="supervisor-warning-card">
-      <mat-card-content>
-        <mat-icon>warning</mat-icon>
-        <div>
-          <strong>Development supervisor warning <app-help-tooltip [text]="helpTopics.supervisor" label="Supervisor help"></app-help-tooltip></strong>
-          <span>{{ devSupervisorWarning() }}</span>
-        </div>
-      </mat-card-content>
-    </mat-card>
+    <section class="agent-alert warning">
+      <mat-icon>warning</mat-icon>
+      <div>
+        <strong>Development supervisor warning <app-help-tooltip [text]="helpTopics.supervisor" label="Supervisor help"></app-help-tooltip></strong>
+        <span>{{ devSupervisorWarning() }}</span>
+      </div>
+    </section>
   }
 
-  <section class="hero-panel agents-hero">
-    <div>
-      <h2>{{ onlineCount() }} / {{ agents().length }} online</h2>
-      <p>Refresh runs live health checks for UI proxy, web, socket, token, agent API, and Podman layers. <app-help-tooltip [text]="helpTopics.page" label="Agent layers help"></app-help-tooltip></p>
-    </div>
-    <mat-chip-set class="chip-row">
-      <mat-chip><mat-icon>hub</mat-icon>{{ agents().length }} registered</mat-chip>
-      <mat-chip><mat-icon>check_circle</mat-icon>{{ onlineCount() }} online</mat-chip>
-      <mat-chip><mat-icon>error</mat-icon>{{ offlineCount() }} attention</mat-chip>
-      @if (devSupervisorMode() !== 'unknown') {
-        <mat-chip><mat-icon>monitor_heart</mat-icon>{{ devSupervisorMode() }}</mat-chip>
-      }
-    </mat-chip-set>
+  <section class="agent-overview" aria-label="Agent overview">
+    <article class="overview-tile">
+      <span><mat-icon>hub</mat-icon>Registered</span>
+      <strong>{{ agents().length }}</strong>
+      <small>{{ selectedAgent()?.id || 'no agent selected' }}</small>
+    </article>
+    <article class="overview-tile good">
+      <span><mat-icon>check_circle</mat-icon>Online</span>
+      <strong>{{ onlineCount() }}</strong>
+      <small>Live health checks passing</small>
+    </article>
+    <article class="overview-tile" [class.warning]="offlineCount() > 0">
+      <span><mat-icon>priority_high</mat-icon>Attention</span>
+      <strong>{{ offlineCount() }}</strong>
+      <small>{{ offlineCount() === 1 ? 'agent needs work' : 'agents need work' }}</small>
+    </article>
+    <article class="overview-tile">
+      <span><mat-icon>monitor_heart</mat-icon>Supervisor</span>
+      <strong>{{ devSupervisorMode() === 'unknown' ? devSupervisorStatus() : devSupervisorMode() }}</strong>
+      <small>{{ devSupervisorStatus() }}</small>
+    </article>
   </section>
 
-  <div class="agents-layout">
-    <section class="agent-list" aria-label="Registered agents">
-      @for (agent of agents(); track agent.id) {
-        <mat-card class="agent-card" [class.selected]="selectedAgentId() === agent.id" (click)="selectedAgentId.set(agent.id)">
-          <mat-card-header>
-            <span mat-card-avatar class="agent-avatar"><mat-icon>dns</mat-icon></span>
-            <mat-card-title>
-              <span>{{ agent.id }}</span>
-              <mat-chip class="status-chip" [class.online]="isOnline(agent)" [class.offline]="!isOnline(agent)">
-                <mat-icon>{{ statusIcon(agent) }}</mat-icon>{{ agentStatus(agent) }}
-              </mat-chip>
-            </mat-card-title>
-            <mat-card-subtitle>{{ agent.linux_username }} · UID {{ agent.linux_uid }}</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <dl class="metadata compact-metadata">
-              <div><dt>Socket <app-help-tooltip [text]="helpTopics.agentSocketPath" label="Socket path help"></app-help-tooltip></dt><dd>{{ agent.socket_path }}</dd></div>
-              <div><dt>Last seen <app-help-tooltip [text]="helpTopics.lastSeen" label="Last seen help"></app-help-tooltip></dt><dd>{{ lastSeen(agent) || 'not reported' }}</dd></div>
-            </dl>
-            <div class="layer-strip" aria-label="Agent health layers">
-              @for (layer of healthLayers(agent); track layer.key) {
-                <span class="layer-pill" [class.ok]="layer.ok" [class.bad]="layer.bad" [matTooltip]="layer.label + ': ' + layer.value + '. ' + layer.help">
-                  <mat-icon>{{ layer.ok ? 'check' : (layer.bad ? 'close' : 'help') }}</mat-icon>{{ layer.label }}
-                </span>
-              }
-            </div>
-          </mat-card-content>
-          <mat-card-actions align="end">
-            <button mat-button type="button" (click)="$event.stopPropagation(); checkHealth(agent)" [disabled]="refreshing()">
-              <mat-icon>monitor_heart</mat-icon>Health
-            </button>
-            <button mat-button type="button" color="warn" (click)="$event.stopPropagation(); rotate(agent)">
-              <mat-icon>vpn_key</mat-icon>Rotate Token
-            </button>
-          </mat-card-actions>
-        </mat-card>
-      } @empty {
-        <mat-card class="empty-agent-card">
-          <mat-card-content>No agents are registered.</mat-card-content>
-        </mat-card>
+  <div class="agents-workspace">
+    <main class="roster-panel">
+      <header class="panel-heading">
+        <div>
+          <span class="eyebrow">Roster</span>
+          <h2>Registered agents</h2>
+        </div>
+        <span class="panel-count">{{ agents().length }} total</span>
+      </header>
+
+      @if (loading()) {
+        <div class="loading-state">
+          <mat-icon>sync</mat-icon>
+          <span>Loading agents</span>
+        </div>
       }
-    </section>
 
-    <mat-card class="health-detail-card">
-      <mat-card-header>
-        <mat-card-title><mat-icon>monitor_heart</mat-icon>Connection Detail</mat-card-title>
-        <mat-card-subtitle>{{ selectedAgent()?.id || 'No agent selected' }}</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        @if (selectedHealthRecord(); as selectedHealth) {
-          <div class="health-matrix">
-            @for (layer of healthDetails(selectedHealth); track layer.key) {
-              <div class="health-row" [class.ok]="layer.ok" [class.bad]="layer.bad">
-                <span class="term-with-help">{{ layer.label }} <app-help-tooltip [text]="layer.help" [label]="layer.label + ' help'"></app-help-tooltip></span>
-                <strong>{{ layer.value }}</strong>
+      <div class="agent-roster">
+        @for (agent of agents(); track agent.id) {
+          <article
+            class="agent-row"
+            role="button"
+            tabindex="0"
+            [class.selected]="selectedAgentId() === agent.id"
+            [class.online]="isOnline(agent)"
+            (click)="selectedAgentId.set(agent.id)"
+            (keydown.enter)="selectedAgentId.set(agent.id)"
+            (keydown.space)="$event.preventDefault(); selectedAgentId.set(agent.id)">
+            <div class="agent-main">
+              <span class="agent-status-mark" [class.online]="isOnline(agent)">
+                <mat-icon>{{ statusIcon(agent) }}</mat-icon>
+              </span>
+              <div class="agent-name">
+                <strong>{{ agent.id }}</strong>
+                <span>{{ agentUserLabel(agent) }}</span>
               </div>
-            }
-          </div>
-          @if (healthError(selectedHealth)) {
-            <div class="health-error">
-              <mat-icon>error</mat-icon>
-              <span>{{ healthError(selectedHealth) }}</span>
+              <span class="status-pill" [class.online]="isOnline(agent)" [class.offline]="!isOnline(agent)">
+                {{ agentStatus(agent) }}
+              </span>
             </div>
-          }
 
-          @if (podmanSocketUnavailable()) {
-            <section class="podman-socket-guide">
-              <header>
-                <span><mat-icon>cable</mat-icon>Enable Podman socket</span>
-                <app-help-tooltip [text]="helpTopics.podmanSocketGuide" label="Podman socket setup help"></app-help-tooltip>
-              </header>
-              <p>Expected rootless socket: <code>{{ podmanSocketPath() }}</code></p>
-              <div class="command-list">
-                @for (item of podmanSocketCommands(); track item.label) {
-                  <article class="command-card">
-                    <div>
-                      <strong>{{ item.label }}</strong>
-                      <span>{{ item.note }}</span>
-                    </div>
-                    <pre>{{ item.command }}</pre>
-                    <button mat-stroked-button type="button" (click)="copyCommand(item.command)">
-                      <mat-icon>content_copy</mat-icon>
-                      Copy
-                    </button>
-                  </article>
+            <div class="agent-fields">
+              <div>
+                <span>Socket</span>
+                <strong>{{ agent.socket_path }}</strong>
+              </div>
+              <div>
+                <span>Last seen</span>
+                <strong>{{ lastSeenLabel(agent) }}</strong>
+              </div>
+              <div>
+                <span>Health</span>
+                <strong>{{ healthSummary(agent) }}</strong>
+              </div>
+            </div>
+
+            <div class="agent-row-footer">
+              <div class="health-rail" [class.ok]="healthTone(agent) === 'ok'" [class.bad]="healthTone(agent) === 'bad'">
+                @for (layer of healthLayers(agent); track layer.key) {
+                  <span class="health-dot" [class.ok]="layer.ok" [class.bad]="layer.bad" [matTooltip]="layerTooltip(layer)">
+                    <mat-icon>{{ layerIcon(layer) }}</mat-icon>
+                    <span>{{ layer.label }}</span>
+                  </span>
                 }
               </div>
-            </section>
-          }
-          <dl class="metadata detail-metadata">
-            <div><dt>Agent user <app-help-tooltip [text]="helpTopics.agentUser" label="Agent user help"></app-help-tooltip></dt><dd>{{ healthMeta(selectedHealth, 'agent_user') }}</dd></div>
-            <div><dt>Agent mode <app-help-tooltip [text]="helpTopics.agentMode" label="Agent mode help"></app-help-tooltip></dt><dd>{{ healthMeta(selectedHealth, 'agent_mode') }}</dd></div>
-            <div><dt>Socket path <app-help-tooltip [text]="helpTopics.agentSocketPath" label="Socket path help"></app-help-tooltip></dt><dd>{{ healthMeta(selectedHealth, 'socket_path') }}</dd></div>
-            <div><dt>Last seen <app-help-tooltip [text]="helpTopics.lastSeen" label="Last seen help"></app-help-tooltip></dt><dd>{{ healthMeta(selectedHealth, 'last_seen_at') }}</dd></div>
-          </dl>
-        } @else {
-          <p class="empty-state">Health has not been checked yet.</p>
+              <div class="row-actions">
+                <button mat-icon-button type="button" matTooltip="Check health" [disabled]="refreshing()" (click)="$event.stopPropagation(); checkHealth(agent)">
+                  <mat-icon>monitor_heart</mat-icon>
+                </button>
+                <button mat-icon-button color="warn" type="button" matTooltip="Rotate token" (click)="$event.stopPropagation(); rotate(agent)">
+                  <mat-icon>vpn_key</mat-icon>
+                </button>
+              </div>
+            </div>
+          </article>
+        } @empty {
+          <article class="empty-state">
+            <mat-icon>hub</mat-icon>
+            <strong>No agents registered</strong>
+            <span>Create the first agent record from the register panel.</span>
+          </article>
         }
-      </mat-card-content>
-    </mat-card>
-  </div>
+      </div>
+    </main>
 
-  <mat-card class="register-card">
-    <mat-card-header>
-      <mat-card-title><mat-icon>add</mat-icon>Register Agent <app-help-tooltip [text]="helpTopics.register" label="Register agent help"></app-help-tooltip></mat-card-title>
-    </mat-card-header>
-    <mat-card-content class="form-grid">
-      <mat-form-field appearance="outline">
-        <mat-label>Agent ID</mat-label>
-        <input matInput [(ngModel)]="newAgentId">
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Linux username</mat-label>
-        <input matInput [(ngModel)]="linuxUsername">
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Linux UID</mat-label>
-        <input matInput type="number" [(ngModel)]="linuxUid">
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Socket path</mat-label>
-        <input matInput [(ngModel)]="socketPath">
-      </mat-form-field>
-    </mat-card-content>
-    <mat-card-actions align="end">
-      <button mat-flat-button color="primary" type="button" (click)="register()">
-        <mat-icon>add</mat-icon>Register
-      </button>
-    </mat-card-actions>
-  </mat-card>
+    <aside class="agent-sidebar">
+      <section class="register-panel">
+        <header class="panel-heading compact">
+          <div>
+            <span class="eyebrow">Provision</span>
+            <h2>Register agent <app-help-tooltip [text]="helpTopics.register" label="Register agent help"></app-help-tooltip></h2>
+          </div>
+        </header>
+        <div class="register-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Agent ID</mat-label>
+            <input matInput [(ngModel)]="newAgentId">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Linux username</mat-label>
+            <input matInput [(ngModel)]="linuxUsername">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Linux UID</mat-label>
+            <input matInput type="number" [(ngModel)]="linuxUid">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Socket path</mat-label>
+            <input matInput [(ngModel)]="socketPath">
+          </mat-form-field>
+        </div>
+        <button mat-flat-button color="primary" type="button" (click)="register()">
+          <mat-icon>add</mat-icon>
+          Register
+        </button>
+      </section>
+
+      <section class="detail-panel">
+        @if (selectedAgent(); as selected) {
+          <header class="detail-header">
+            <div>
+              <span class="eyebrow">Selected</span>
+              <h2>{{ selected.id }}</h2>
+              <small>{{ agentUserLabel(selected) }}</small>
+            </div>
+            <span class="status-pill" [class.online]="isOnline(selected)" [class.offline]="!isOnline(selected)">
+              <mat-icon>{{ statusIcon(selected) }}</mat-icon>
+              {{ agentStatus(selected) }}
+            </span>
+          </header>
+
+          @if (selectedHealthRecord(); as selectedHealth) {
+            <section class="connection-stack">
+              @for (layer of healthDetails(selectedHealth); track layer.key) {
+                <div class="connection-row" [class.ok]="layer.ok" [class.bad]="layer.bad">
+                  <span>
+                    <mat-icon>{{ layerIcon(layer) }}</mat-icon>
+                    {{ layer.label }}
+                    <app-help-tooltip [text]="layer.help" [label]="layer.label + ' help'"></app-help-tooltip>
+                  </span>
+                  <strong>{{ layer.value }}</strong>
+                </div>
+              }
+            </section>
+
+            @if (healthError(selectedHealth)) {
+              <div class="health-error">
+                <mat-icon>error</mat-icon>
+                <span>{{ healthError(selectedHealth) }}</span>
+              </div>
+            }
+
+            @if (podmanSocketUnavailable()) {
+              <section class="podman-socket-guide">
+                <header>
+                  <span><mat-icon>cable</mat-icon>Enable Podman socket</span>
+                  <app-help-tooltip [text]="helpTopics.podmanSocketGuide" label="Podman socket setup help"></app-help-tooltip>
+                </header>
+                <p><code>{{ podmanSocketPath() }}</code></p>
+                <div class="command-list">
+                  @for (item of podmanSocketCommands(); track item.label) {
+                    <article class="command-card">
+                      <div>
+                        <strong>{{ item.label }}</strong>
+                        <span>{{ item.note }}</span>
+                      </div>
+                      <pre>{{ item.command }}</pre>
+                      <button mat-stroked-button type="button" (click)="copyCommand(item.command)">
+                        <mat-icon>content_copy</mat-icon>
+                        Copy
+                      </button>
+                    </article>
+                  }
+                </div>
+              </section>
+            }
+
+            <dl class="agent-metadata">
+              <div>
+                <dt>Agent user <app-help-tooltip [text]="helpTopics.agentUser" label="Agent user help"></app-help-tooltip></dt>
+                <dd>{{ healthMeta(selectedHealth, 'agent_user') }}</dd>
+              </div>
+              <div>
+                <dt>Agent mode <app-help-tooltip [text]="helpTopics.agentMode" label="Agent mode help"></app-help-tooltip></dt>
+                <dd>{{ healthMeta(selectedHealth, 'agent_mode') }}</dd>
+              </div>
+              <div>
+                <dt>Socket path <app-help-tooltip [text]="helpTopics.agentSocketPath" label="Socket path help"></app-help-tooltip></dt>
+                <dd>{{ healthMeta(selectedHealth, 'socket_path') }}</dd>
+              </div>
+              <div>
+                <dt>Last seen <app-help-tooltip [text]="helpTopics.lastSeen" label="Last seen help"></app-help-tooltip></dt>
+                <dd>{{ healthMeta(selectedHealth, 'last_seen_at') }}</dd>
+              </div>
+            </dl>
+          } @else {
+            <p class="empty-text">Health has not been checked yet.</p>
+          }
+        } @else {
+          <p class="empty-text">Select an agent to inspect connection health.</p>
+        }
+      </section>
+    </aside>
+  </div>
 </section>

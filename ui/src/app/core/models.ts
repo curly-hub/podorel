@@ -27,6 +27,21 @@ export interface CreatedAgentToken {
   token: string;
 }
 
+export interface PasskeyCredential {
+  id: string;
+  user_id: string;
+  credential_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  last_used_at?: string;
+}
+
+export interface PasskeyBeginResponse {
+  flow_id: string;
+  public_key: Record<string, unknown>;
+}
+
 export interface Pod {
   id: string;
   agent_id: string;
@@ -235,6 +250,8 @@ export interface AppSettings {
     listen_addr: string;
     public_url: string;
     trusted_proxy_mode: boolean;
+    tls_cert_file?: string;
+    tls_key_file?: string;
   };
   auth?: {
     session_ttl: number;

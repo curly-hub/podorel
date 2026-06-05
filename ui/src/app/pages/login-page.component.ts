@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ApiError, ApiService } from '../core/api.service';
+import { credentialToJSON, formatPasskeyError, passkeySecureContext, passkeysSupported, passkeyUnavailableMessage, toPublicKeyRequestOptions } from '../core/passkeys';
 
 @Component({
   selector: 'app-login-page',
@@ -29,6 +30,14 @@ export class LoginPageComponent implements OnInit {
     return typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
   }
 
+  get passkeyReady(): boolean {
+    return passkeysSupported() && passkeySecureContext();
+  }
+
+  get passkeyStatus(): string {
+    return passkeyUnavailableMessage() || 'Use your device passkey.';
+  }
+
   ngOnInit(): void {
     void this.redirectIfAlreadyAuthenticated();
   }
@@ -39,6 +48,20 @@ export class LoginPageComponent implements OnInit {
 
   async loginAgent(): Promise<void> {
     await this.runLogin(() => this.api.loginWithAgentToken(this.agentToken));
+  }
+
+  async loginPasskey(): Promise<void> {
+    await this.runLogin(async () => {
+      if (!this.passkeyReady) {
+        throw new Error(passkeyUnavailableMessage() || 'Passkey login is not available.');
+      }
+      const begin = await this.api.beginPasskeyLogin();
+      const credential = await navigator.credentials.get({ publicKey: toPublicKeyRequestOptions(begin.public_key) });
+      if (!(credential instanceof PublicKeyCredential)) {
+        throw new Error('Passkey login was cancelled.');
+      }
+      await this.api.finishPasskeyLogin(begin.flow_id, credentialToJSON(credential));
+    });
   }
 
   private async runLogin(work: () => Promise<void>): Promise<void> {
@@ -74,6 +97,13 @@ export class LoginPageComponent implements OnInit {
   private formatError(error: unknown): string {
     if (error instanceof ApiError) {
       return `${error.message} Correlation ID: ${error.correlationId}`;
+    }
+    const passkeyError = formatPasskeyError(error, '');
+    if (passkeyError) {
+      return passkeyError;
+    }
+    if (error instanceof Error) {
+      return error.message;
     }
     return 'Sign in failed. Correlation ID unavailable.';
   }

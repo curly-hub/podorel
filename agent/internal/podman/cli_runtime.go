@@ -24,9 +24,10 @@ const (
 )
 
 type PodmanCLIRuntime struct {
-	Binary  string
-	Timeout time.Duration
-	Logger  *logging.Logger
+	Binary     string
+	Timeout    time.Duration
+	Logger     *logging.Logger
+	CPUTracker CPUTracker
 }
 
 type PodmanCommandError struct {
@@ -115,6 +116,7 @@ func (r *PodmanCLIRuntime) Stats(ctx context.Context) ([]ContainerStats, error) 
 	if err != nil {
 		return nil, err
 	}
+	stats = r.CPUTracker.Apply(stats, time.Now())
 	if r.Logger != nil {
 		r.Logger.Debug(ctx, "podman_stats_parse", "parsed podman stats", map[string]any{
 			"raw_payload_length": len(out),

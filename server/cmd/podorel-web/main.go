@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
+	"crypto/tls"
 	"net"
 	"net/http"
 	"os"
@@ -37,8 +37,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	logger.Info(ctx, "startup", "podorel web starting", map[string]any{
-		"listen_addr": cfg.Server.ListenAddr,
-		"mode":        cfg.Mode.String(),
+		"listen_addr":   cfg.Server.ListenAddr,
+		"mode":          cfg.Mode.String(),
+		"https":         cfg.Server.TLSEnabled(),
+		"http_redirect": cfg.Server.TLSEnabled(),
+		"public_url":    cfg.Server.PublicURL,
 	})
 
 	store, err := db.Open(ctx, cfg.Database.Path, db.DefaultMigrationDir)
@@ -58,6 +61,9 @@ func main() {
 		Addr:              cfg.Server.ListenAddr,
 		Handler:           webApp.Handler(),
 		ReadHeaderTimeout: readHeaderTimeout,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
 	}
 
 	listener, err := net.Listen("tcp", cfg.Server.ListenAddr)
@@ -75,21 +81,49 @@ func main() {
 		logger.Info(ctx, "systemd_watchdog", "systemd watchdog heartbeat enabled", nil)
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- server.Serve(listener)
-	}()
+	errCh := make(chan error, 3)
+	var redirectServer *http.Server
+	if cfg.Server.TLSEnabled() {
+		mux := newProtocolMux(listener, readHeaderTimeout)
+		redirectServer = &http.Server{
+			Addr:              cfg.Server.ListenAddr,
+			Handler:           httpsRedirectHandler(cfg.Server.PublicURL),
+			ReadHeaderTimeout: readHeaderTimeout,
+		}
+		go func() {
+			errCh <- mux.Serve(ctx)
+		}()
+		go func() {
+			errCh <- redirectServer.Serve(mux.HTTPListener())
+		}()
+		go func() {
+			errCh <- server.ServeTLS(mux.TLSListener(), cfg.Server.TLSCertFile, cfg.Server.TLSKeyFile)
+		}()
+	} else {
+		go func() {
+			errCh <- server.Serve(listener)
+		}()
+	}
 
 	select {
 	case <-ctx.Done():
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
+		if cfg.Server.TLSEnabled() {
+			_ = listener.Close()
+		}
 		if err := server.Shutdown(shutdownCtx); err != nil {
 			logger.Error(context.Background(), "http_shutdown", "web server graceful shutdown failed", map[string]any{"error": err.Error()})
 			os.Exit(1)
 		}
+		if redirectServer != nil {
+			if err := redirectServer.Shutdown(shutdownCtx); err != nil {
+				logger.Error(context.Background(), "http_redirect_shutdown", "HTTP redirect server graceful shutdown failed", map[string]any{"error": err.Error()})
+				os.Exit(1)
+			}
+		}
 	case err := <-errCh:
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err != nil && !isExpectedServerStop(err) {
 			logger.Error(ctx, "http_listen", "web server stopped unexpectedly", map[string]any{
 				"listen_addr": cfg.Server.ListenAddr,
 				"error":       err.Error(),

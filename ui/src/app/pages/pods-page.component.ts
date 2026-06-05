@@ -16,14 +16,15 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { ApiError, ApiService } from '../core/api.service';
 import { Agent, LifecycleAction, PodView, SecuritySummary } from '../core/models';
-import { aggregateResourceSamples, cpuProgressValue, formatCpuPercent, formatMemoryDisplay, memoryProgressValue, StatsAggregate } from '../core/stats';
+import { aggregateResourceSamples, cpuProgressValue, formatCpuPercent, formatMemoryDisplay, formatMemoryLimitDetail, formatMemoryLimitStatus, memoryProgressValue, StatsAggregate } from '../core/stats';
 import { ConfirmationDialogComponent, ConfirmationDialogResult } from '../shared/confirmation-dialog/confirmation-dialog.component';
 import { HelpTooltipComponent } from '../shared/help-tooltip/help-tooltip.component';
+import { ScaleGuardrailWarningComponent } from '../shared/scale-guardrail-warning/scale-guardrail-warning.component';
 
 @Component({
   selector: 'app-pods-page',
   standalone: true,
-  imports: [FormsModule, HelpTooltipComponent, RouterLink, MatButtonModule, MatCardModule, MatChipsModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, MatMenuModule, MatProgressBarModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
+  imports: [FormsModule, HelpTooltipComponent, ScaleGuardrailWarningComponent, RouterLink, MatButtonModule, MatCardModule, MatChipsModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, MatMenuModule, MatProgressBarModule, MatSelectModule, MatSnackBarModule, MatTooltipModule],
   templateUrl: './pods-page.component.html',
   styleUrls: ['./pods-page.component.scss']
 })
@@ -34,8 +35,8 @@ export class PodsPageComponent implements OnInit {
     health: 'Health is the best-known container or pod health reported by Podman, or unknown when no health check exists.',
     scan: 'Security scan state for this pod image. Not scanned means no scanner result has been recorded yet.',
     source: 'Snapshot source tells you whether the row is live agent data or development/test cached data.',
-    cpu: 'CPU comes from live Podman stats samples and is normalized against total host CPU capacity.',
-    memory: 'Memory shows live usage from Podman stats samples for containers in this pod.',
+    cpu: 'CPU comes from live Podman cpu_time deltas, so it reflects current activity instead of Podman average CPU.',
+    memory: 'Memory shows live usage. The cap line flags whether sampled containers have configured app memory limits.',
     statsSource: 'This shows how many container stats rows were sampled for the current pod list.',
     containers: 'Container count and state summary for containers inside this pod.',
     uptime: 'Approximate time since the pod creation timestamp reported by Podman.',
@@ -149,6 +150,30 @@ export class PodsPageComponent implements OnInit {
     return formatMemoryDisplay(stats);
   }
 
+  cpuSampleLabel(pod: PodView): string {
+    return this.statsAvailable(pod) ? 'live sample' : 'not sampled';
+  }
+
+  memoryLimitLabel(pod: PodView): string {
+    return formatMemoryLimitStatus(this.podStats(pod));
+  }
+
+  memoryLimitTooltip(pod: PodView): string {
+    return formatMemoryLimitDetail(this.podStats(pod));
+  }
+
+  memoryLimitWarning(pod: PodView): boolean {
+    return this.podStats(pod).memoryLikelyUncappedCount > 0;
+  }
+
+  uncappedPodCount(): number {
+    return this.pods().filter((pod) => this.podStats(pod).memoryLikelyUncappedCount > 0).length;
+  }
+
+  uncappedContainerCount(): number {
+    return this.pods().reduce((total, pod) => total + this.podStats(pod).memoryLikelyUncappedCount, 0);
+  }
+
   statsSourceLabel(pod: PodView): string {
     const stats = this.podStats(pod);
     if (!stats.available) {
@@ -239,6 +264,28 @@ export class PodsPageComponent implements OnInit {
       return 'security_update_warning';
     }
     return 'security';
+  }
+
+  securityScanClass(): string {
+    const status = (this.security()?.latest_scan?.status || '').toLowerCase();
+    if (status === 'complete') {
+      return 'scan-ok';
+    }
+    if (status === 'failed' || status === 'unavailable') {
+      return 'scan-warning';
+    }
+    return 'scan-muted';
+  }
+
+  healthClass(pod: PodView): string {
+    const health = (pod.health || 'unknown').toLowerCase();
+    if (health === 'healthy') {
+      return 'health-ok';
+    }
+    if (health === 'unhealthy' || health === 'starting' || health === 'degraded') {
+      return 'health-warning';
+    }
+    return 'health-muted';
   }
 
   canStart(pod: PodView): boolean {

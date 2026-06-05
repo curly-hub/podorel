@@ -19,6 +19,7 @@
     <div class="auth-signals">
       <span><mat-icon>cookie</mat-icon>Session auth</span>
       <span><mat-icon>verified_user</mat-icon>CSRF protected</span>
+      <span><mat-icon>fingerprint</mat-icon>Passkeys</span>
       <span><mat-icon>vpn_key</mat-icon>Scoped agent tokens</span>
     </div>
   </div>
@@ -26,7 +27,7 @@
   <mat-card class="auth-card">
     <mat-card-header>
       <mat-card-title>Sign in</mat-card-title>
-      <mat-card-subtitle>Use the admin password or an agent-scoped token.</mat-card-subtitle>
+      <mat-card-subtitle>Use a passkey, admin password, or an agent-scoped token.</mat-card-subtitle>
     </mat-card-header>
 
     <mat-card-content>
@@ -36,6 +37,20 @@
           <span>{{ error }}</span>
         </div>
       }
+
+      <div class="passkey-panel" [class.blocked]="!passkeyReady">
+        <div class="passkey-copy">
+          <mat-icon>fingerprint</mat-icon>
+          <div>
+            <strong>Passkey</strong>
+            <span>{{ passkeyStatus }}</span>
+          </div>
+        </div>
+        <button mat-flat-button color="primary" type="button" [disabled]="busy || !passkeyReady" (click)="loginPasskey()">
+          <mat-icon>fingerprint</mat-icon>
+          Continue
+        </button>
+      </div>
 
       <mat-tab-group>
         <mat-tab label="Password">

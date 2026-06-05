@@ -32,13 +32,6 @@ func ParseCPUPercent(raw string) (float64, error) {
 	return value, nil
 }
 
-func NormalizeCPUHostTotal(podmanPercent float64, hostCPUs int) float64 {
-	if hostCPUs <= 0 {
-		hostCPUs = 1
-	}
-	return podmanPercent / float64(hostCPUs)
-}
-
 func ParseMemoryUsage(raw string) (MemoryParseResult, error) {
 	result := MemoryParseResult{
 		Raw:       raw,
@@ -102,7 +95,7 @@ func memoryUnitFactor(unit string) (float64, string, bool) {
 	}
 }
 
-func ParseStatsJSON(raw []byte, hostCPUs int) ([]ContainerStats, error) {
+func ParseStatsJSON(raw []byte, _ int) ([]ContainerStats, error) {
 	var rows []map[string]any
 	if err := json.Unmarshal(raw, &rows); err != nil {
 		var envelope struct {
@@ -129,17 +122,22 @@ func ParseStatsJSON(raw []byte, hostCPUs int) ([]ContainerStats, error) {
 		if err != nil {
 			return nil, err
 		}
+		cpuTime := optionalDurationField(row, "cpu_time", "CPUTime", "cpuTime")
 		memory, err := ParseMemoryUsage(memRaw)
 		if err != nil {
 			return nil, err
 		}
 		stats = append(stats, ContainerStats{
-			ContainerID:         optionalStringField(row, "id", "ID", "container_id", "ContainerID"),
-			PodID:               optionalStringField(row, "pod", "pod_id", "PodID"),
-			Name:                optionalStringField(row, "name", "Name"),
-			CPUPodmanRaw:        cpuRaw,
-			CPUPodmanPercent:    cpu,
-			CPUPercentHostTotal: NormalizeCPUHostTotal(cpu, hostCPUs),
+			ContainerID:      optionalStringField(row, "id", "ID", "container_id", "ContainerID"),
+			PodID:            optionalStringField(row, "pod", "pod_id", "PodID"),
+			Name:             optionalStringField(row, "name", "Name"),
+			CPUPodmanRaw:     cpuRaw,
+			CPUPodmanPercent: cpu,
+			// Podman already reports the top-style container CPU percentage.
+			// It can exceed 100% when a container uses multiple CPUs. Dividing
+			// by the host CPU count made busy containers look nearly idle.
+			CPUPercentHostTotal: cpu,
+			CPUTimeNanos:        cpuTime.Nanoseconds(),
 			MemoryPodmanRaw:     memRaw,
 			MemoryBytes:         memory.Bytes,
 			MemoryLimitRaw:      memory.LimitRaw,
@@ -201,6 +199,35 @@ func optionalTimeField(row map[string]any, keys ...string) time.Time {
 		}
 	}
 	return time.Time{}
+}
+
+func optionalDurationField(row map[string]any, keys ...string) time.Duration {
+	for _, key := range keys {
+		value, ok := row[key]
+		if !ok {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			parsed, err := time.ParseDuration(strings.TrimSpace(typed))
+			if err == nil {
+				return parsed
+			}
+		case float64:
+			if typed > 0 {
+				return time.Duration(typed)
+			}
+		case int:
+			if typed > 0 {
+				return time.Duration(typed)
+			}
+		case int64:
+			if typed > 0 {
+				return time.Duration(typed)
+			}
+		}
+	}
+	return 0
 }
 
 func parsePodmanTimeString(value string) (time.Time, bool) {

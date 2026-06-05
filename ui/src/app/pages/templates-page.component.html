@@ -1,14 +1,20 @@
-<section class="page">
+<section class="page templates-page">
   <header class="page-header">
     <div class="page-title">
       <span class="eyebrow">Catalog</span>
       <h1>Templates</h1>
-      <p>Schema-validated templates ready for pod creation.</p>
+      <p>Deploy known services, inspect compose bundles, and draft pod or compose catalog files.</p>
     </div>
-    <button mat-flat-button color="primary" routerLink="/create-pod">
-      <mat-icon>add</mat-icon>
-      Create Pod
-    </button>
+    <div class="header-actions">
+      <button mat-stroked-button type="button" (click)="refresh()">
+        <mat-icon>refresh</mat-icon>
+        Refresh
+      </button>
+      <button mat-flat-button color="primary" routerLink="/create-pod">
+        <mat-icon>rocket_launch</mat-icon>
+        Create Pod
+      </button>
+    </div>
   </header>
 
   @if (error()) {
@@ -20,64 +26,358 @@
   <section class="hero-panel templates-hero">
     <div>
       <h2>{{ templates().length }} pod templates · {{ composeStacks().length }} compose stacks</h2>
-      <p>Review images, commands, declared ports, restart policy, and notes before provisioning.</p>
+      <p>Every catalog item should declare ports, restart behavior, and resource intent before deployment.</p>
     </div>
+    <mat-chip-set class="chip-row">
+      <mat-chip><mat-icon>view_module</mat-icon>{{ filteredTemplates().length }} visible pods</mat-chip>
+      <mat-chip><mat-icon>dynamic_feed</mat-icon>{{ filteredComposeStacks().length }} visible stacks</mat-chip>
+    </mat-chip-set>
   </section>
 
-  <div class="pod-grid">
-    @for (template of templates(); track template.id) {
-      <mat-card>
-        <mat-card-header>
-          <span mat-card-avatar class="pod-avatar"><mat-icon>view_module</mat-icon></span>
-          <mat-card-title>{{ template.name }}</mat-card-title>
-          <mat-card-subtitle>{{ template.id }} · {{ template.version }}</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <p>{{ template.description }}</p>
-          <mat-chip-set class="chip-row">
-            <mat-chip><mat-icon>apps</mat-icon>{{ template.image }}</mat-chip>
-            <mat-chip><mat-icon>terminal</mat-icon>{{ commandLabel(template) }}</mat-chip>
-            <mat-chip><mat-icon>restart_alt</mat-icon>{{ template.restart_policy }}</mat-chip>
-            @for (port of template.ports; track port.host + '-' + port.container) {
-              <mat-chip><mat-icon>settings_ethernet</mat-icon>{{ port.host }}:{{ port.container }}/{{ port.protocol }}</mat-chip>
-            }
-          </mat-chip-set>
-        </mat-card-content>
-      </mat-card>
-    } @empty {
-      <mat-card>
-        <mat-card-content>No templates are available.</mat-card-content>
-      </mat-card>
-    }
-  </div>
-
-  <section class="section-heading">
-    <h2>Compose stacks</h2>
+  <section class="catalog-filters">
+    <mat-form-field appearance="outline">
+      <mat-label>Search catalog</mat-label>
+      <input matInput [(ngModel)]="search" placeholder="nginx, redis, postgres, compose">
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Type</mat-label>
+      <mat-select [(ngModel)]="filter">
+        <mat-option value="all">All</mat-option>
+        <mat-option value="pods">Pod templates</mat-option>
+        <mat-option value="compose">Compose stacks</mat-option>
+      </mat-select>
+    </mat-form-field>
   </section>
 
-  <div class="pod-grid">
-    @for (stack of composeStacks(); track stack.id) {
-      <mat-card>
-        <mat-card-header>
-          <span mat-card-avatar class="pod-avatar"><mat-icon>dynamic_feed</mat-icon></span>
-          <mat-card-title>{{ stack.name }}</mat-card-title>
-          <mat-card-subtitle>{{ stack.id }} · {{ stack.version }}</mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          <p>{{ stack.description }}</p>
-          <mat-chip-set class="chip-row">
-            <mat-chip><mat-icon>folder</mat-icon>{{ stack.source_path }}</mat-chip>
-            @for (composeFile of stack.compose_files; track composeFile) {
-              <mat-chip><mat-icon>description</mat-icon>{{ composeFile }}</mat-chip>
+  <div class="templates-workspace" [class.compose-builder-active]="draftMode === 'compose'">
+    <main class="catalog-main">
+      @if (filter !== 'compose') {
+        <section class="catalog-section">
+          <header class="section-heading">
+            <span><mat-icon>view_module</mat-icon>Pod Templates</span>
+            <small>{{ filteredTemplates().length }} shown</small>
+          </header>
+
+          <div class="template-grid">
+            @for (template of filteredTemplates(); track template.id) {
+              <article class="catalog-card">
+                <header>
+                  <span class="catalog-icon"><mat-icon>view_module</mat-icon></span>
+                  <div>
+                    <h2>{{ template.name }}</h2>
+                    <small>{{ template.id }} · {{ template.version }}</small>
+                  </div>
+                </header>
+                <p>{{ template.description }}</p>
+                <dl>
+                  <div>
+                    <dt>Image</dt>
+                    <dd>{{ template.image }}</dd>
+                  </div>
+                  <div>
+                    <dt>Resources</dt>
+                    <dd>{{ resourceLabel(template) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Ports</dt>
+                    <dd>{{ portLabel(template) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Secrets</dt>
+                    <dd>{{ secretLabel(template) }}</dd>
+                  </div>
+                </dl>
+                <mat-chip-set class="chip-row">
+                  <mat-chip><mat-icon>terminal</mat-icon>{{ commandLabel(template) }}</mat-chip>
+                  <mat-chip><mat-icon>restart_alt</mat-icon>{{ template.restart_policy }}</mat-chip>
+                </mat-chip-set>
+                <footer>
+                  <button mat-stroked-button type="button" [routerLink]="['/create-pod']" [queryParams]="{ template: template.id }">
+                    <mat-icon>rocket_launch</mat-icon>
+                    Use
+                  </button>
+                </footer>
+              </article>
+            } @empty {
+              <article class="empty-state">
+                <mat-icon>inventory_2</mat-icon>
+                <span>No pod templates match the current filter.</span>
+              </article>
             }
-            <mat-chip><mat-icon>deployed_code</mat-icon>{{ composeServiceLabel(stack) }}</mat-chip>
-          </mat-chip-set>
-        </mat-card-content>
-      </mat-card>
-    } @empty {
-      <mat-card>
-        <mat-card-content>No compose stacks are available.</mat-card-content>
-      </mat-card>
-    }
+          </div>
+        </section>
+      }
+
+      @if (filter !== 'pods') {
+        <section class="catalog-section">
+          <header class="section-heading">
+            <span><mat-icon>dynamic_feed</mat-icon>Compose Stacks</span>
+            <small>{{ filteredComposeStacks().length }} shown</small>
+          </header>
+
+          <div class="template-grid compose-grid">
+            @for (stack of filteredComposeStacks(); track stack.id) {
+              <article class="catalog-card">
+                <header>
+                  <span class="catalog-icon stack"><mat-icon>dynamic_feed</mat-icon></span>
+                  <div>
+                    <h2>{{ stack.name }}</h2>
+                    <small>{{ stack.id }} · {{ stack.version }}</small>
+                  </div>
+                </header>
+                <p>{{ stack.description }}</p>
+                <dl>
+                  <div>
+                    <dt>Source</dt>
+                    <dd>{{ stack.source_path }}</dd>
+                  </div>
+                  <div>
+                    <dt>Files</dt>
+                    <dd>{{ stack.compose_files.join(', ') }}</dd>
+                  </div>
+                  <div>
+                    <dt>Services</dt>
+                    <dd>{{ composeServiceLabel(stack) }}</dd>
+                  </div>
+                </dl>
+                @if (stack.notes.length) {
+                  <ul>
+                    @for (note of stack.notes; track note) {
+                      <li>{{ note }}</li>
+                    }
+                  </ul>
+                }
+                <footer>
+                  <button mat-stroked-button type="button" [routerLink]="['/create-pod']" [queryParams]="{ mode: 'compose', stack: stack.id }">
+                    <mat-icon>publish</mat-icon>
+                    Deploy
+                  </button>
+                </footer>
+              </article>
+            } @empty {
+              <article class="empty-state">
+                <mat-icon>dynamic_feed</mat-icon>
+                <span>No compose stacks match the current filter.</span>
+              </article>
+            }
+          </div>
+        </section>
+      }
+    </main>
+
+    <aside class="draft-panel">
+      <section class="draft-builder">
+        <header>
+          <div>
+            <span>Catalog Draft</span>
+            <h2>Create catalog files</h2>
+          </div>
+          <mat-chip>export only</mat-chip>
+        </header>
+
+        <div class="draft-switch" aria-label="Draft type">
+          <button type="button" [class.active]="draftMode === 'pod'" (click)="draftMode = 'pod'">
+            <mat-icon>view_module</mat-icon>
+            Pod
+          </button>
+          <button type="button" [class.active]="draftMode === 'compose'" (click)="draftMode = 'compose'">
+            <mat-icon>dynamic_feed</mat-icon>
+            Compose
+          </button>
+        </div>
+
+        @if (draftMode === 'pod') {
+          <div class="draft-form">
+            <mat-form-field appearance="outline">
+              <mat-label>ID</mat-label>
+              <input matInput [(ngModel)]="draft.id">
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Name</mat-label>
+              <input matInput [(ngModel)]="draft.name">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Description</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="draft.description"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Image</mat-label>
+              <input matInput [(ngModel)]="draft.image">
+            </mat-form-field>
+            <div class="draft-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Host port</mat-label>
+                <input matInput type="number" [(ngModel)]="draft.hostPort">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Container port</mat-label>
+                <input matInput type="number" [(ngModel)]="draft.containerPort">
+              </mat-form-field>
+            </div>
+            <div class="draft-row">
+              <mat-form-field appearance="outline">
+                <mat-label>CPU</mat-label>
+                <input matInput [(ngModel)]="draft.cpu">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Memory</mat-label>
+                <input matInput [(ngModel)]="draft.memory">
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline">
+              <mat-label>Restart policy</mat-label>
+              <mat-select [(ngModel)]="draft.restartPolicy">
+                <mat-option value="no">no</mat-option>
+                <mat-option value="on-failure">on-failure</mat-option>
+                <mat-option value="always">always</mat-option>
+                <mat-option value="unless-stopped">unless-stopped</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Command lines</mat-label>
+              <textarea matInput rows="3" [(ngModel)]="draft.commandText"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Environment lines</mat-label>
+              <textarea matInput rows="3" [(ngModel)]="draft.environmentText" placeholder="KEY=value"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Notes</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="draft.notesText"></textarea>
+            </mat-form-field>
+          </div>
+
+          <div class="draft-actions">
+            <button mat-stroked-button type="button" (click)="copyDraftManifest()">
+              <mat-icon>content_copy</mat-icon>
+              Copy JSON
+            </button>
+            <button mat-flat-button color="primary" type="button" (click)="downloadDraftManifest()">
+              <mat-icon>download</mat-icon>
+              Download
+            </button>
+          </div>
+        } @else {
+          <div class="compose-builder-form">
+            <section class="compose-presets">
+              <span>Starter</span>
+              <div class="preset-grid">
+                @for (preset of composePresets; track preset.id) {
+                  <button type="button" [class.active]="composeDraft.presetId === preset.id" (click)="loadComposePreset(preset)">
+                    <mat-icon>{{ preset.icon }}</mat-icon>
+                    <strong>{{ preset.name }}</strong>
+                    <small>{{ preset.description }}</small>
+                  </button>
+                }
+              </div>
+            </section>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Stack ID</mat-label>
+              <input matInput [(ngModel)]="composeDraft.id">
+            </mat-form-field>
+            <div class="draft-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Name</mat-label>
+                <input matInput [(ngModel)]="composeDraft.name">
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Version</mat-label>
+                <input matInput [(ngModel)]="composeDraft.version">
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Description</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="composeDraft.description"></textarea>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline" class="wide-field compose-editor-field">
+              <mat-label>docker-compose.yml</mat-label>
+              <textarea matInput rows="18" class="compose-editor" [(ngModel)]="composeDraft.composeYamlText"></textarea>
+            </mat-form-field>
+
+            <section class="compose-summary">
+              <header>
+                <span>Parsed services</span>
+                <mat-chip [class.warn]="!composeServices().length">{{ composeStatusLabel() }}</mat-chip>
+              </header>
+              <strong>{{ composeSummaryLabel() }}</strong>
+              @if (composeServices().length) {
+                <div class="service-list">
+                  @for (service of composeServices(); track service.name) {
+                    <article>
+                      <span>{{ service.name }}</span>
+                      <small>{{ service.image || service.build || 'image not declared' }}</small>
+                      <em>{{ service.ports?.join(', ') || 'no published ports' }}</em>
+                    </article>
+                  }
+                </div>
+              } @else {
+                <p>No Compose services found.</p>
+              }
+            </section>
+
+            <div class="compose-path">
+              <span>Folder</span>
+              <code>{{ composeFolderPath() }}</code>
+            </div>
+
+            <div class="draft-row">
+              <mat-form-field appearance="outline">
+                <mat-label>Env files</mat-label>
+                <textarea matInput rows="2" [(ngModel)]="composeDraft.environmentFilesText" placeholder=".env.example"></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Required files</mat-label>
+                <textarea matInput rows="2" [(ngModel)]="composeDraft.requiredFilesText"></textarea>
+              </mat-form-field>
+            </div>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Labels</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="composeDraft.labelsText" placeholder="KEY=value"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="wide-field">
+              <mat-label>Notes</mat-label>
+              <textarea matInput rows="2" [(ngModel)]="composeDraft.notesText"></textarea>
+            </mat-form-field>
+          </div>
+
+          <div class="draft-actions">
+            <button mat-stroked-button type="button" (click)="copyComposeManifest()">
+              <mat-icon>content_copy</mat-icon>
+              Copy manifest
+            </button>
+            <button mat-stroked-button type="button" (click)="copyComposeYaml()">
+              <mat-icon>content_copy</mat-icon>
+              Copy YAML
+            </button>
+            <button mat-flat-button color="primary" type="button" (click)="downloadComposeManifest()">
+              <mat-icon>download</mat-icon>
+              Manifest
+            </button>
+            <button mat-flat-button color="primary" type="button" (click)="downloadComposeYaml()">
+              <mat-icon>download</mat-icon>
+              Compose
+            </button>
+          </div>
+        }
+      </section>
+
+      <section class="manifest-preview">
+        <header>
+          <span><mat-icon>data_object</mat-icon>{{ draftMode === 'pod' ? 'Manifest' : 'podorel-compose.json' }}</span>
+        </header>
+        <pre>{{ draftMode === 'pod' ? draftManifest() : composeManifest() }}</pre>
+      </section>
+
+      @if (draftMode === 'compose') {
+        <section class="manifest-preview">
+          <header>
+            <span><mat-icon>description</mat-icon>docker-compose.yml</span>
+          </header>
+          <pre>{{ composeYaml() }}</pre>
+        </section>
+      }
+    </aside>
   </div>
 </section>

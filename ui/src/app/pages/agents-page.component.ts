@@ -2,8 +2,6 @@ import { DatePipe } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -23,7 +21,7 @@ type HealthLayer = { key: string; label: string; help: string; value: string; ok
 @Component({
   selector: 'app-agents-page',
   standalone: true,
-  imports: [DatePipe, FormsModule, HelpTooltipComponent, MatButtonModule, MatCardModule, MatChipsModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressBarModule, MatSnackBarModule, MatTooltipModule],
+  imports: [DatePipe, FormsModule, HelpTooltipComponent, MatButtonModule, MatDialogModule, MatFormFieldModule, MatIconModule, MatInputModule, MatProgressBarModule, MatSnackBarModule, MatTooltipModule],
   templateUrl: './agents-page.component.html',
   styleUrls: ['./agents-page.component.scss']
 })
@@ -192,6 +190,37 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
     return this.agentStatus(agent) === 'registered' ? 'pending' : 'error';
   }
 
+  healthScore(agent: Agent): string {
+    const layers = this.healthLayers(agent);
+    const healthy = layers.filter((layer) => layer.ok).length;
+    return `${healthy}/${layers.length}`;
+  }
+
+  healthIssueLabel(agent: Agent): string {
+    const issues = this.healthLayers(agent).filter((layer) => layer.bad).length;
+    if (issues === 0) {
+      return 'No blocking layers';
+    }
+    return issues === 1 ? '1 layer needs attention' : `${issues} layers need attention`;
+  }
+
+  healthSummary(agent: Agent): string {
+    const score = `${this.healthScore(agent)} healthy`;
+    const issueLabel = this.healthIssueLabel(agent);
+    return issueLabel === 'No blocking layers' ? score : `${score} / ${issueLabel}`;
+  }
+
+  healthTone(agent: Agent): string {
+    const layers = this.healthLayers(agent);
+    if (layers.some((layer) => layer.bad)) {
+      return 'bad';
+    }
+    if (layers.every((layer) => layer.ok)) {
+      return 'ok';
+    }
+    return 'neutral';
+  }
+
   isOnline(agent: Agent): boolean {
     const status = this.agentStatus(agent).toLowerCase();
     return status === 'ok' || status === 'online';
@@ -219,6 +248,20 @@ export class AgentsPageComponent implements OnInit, OnDestroy {
       const value = this.valueText(health?.[layer.key]);
       return { ...layer, value, ok: this.isHealthyValue(value), bad: this.isBadValue(value) };
     });
+  }
+
+  layerIcon(layer: HealthLayer): string {
+    if (layer.ok) {
+      return 'check';
+    }
+    if (layer.bad) {
+      return 'priority_high';
+    }
+    return 'question_mark';
+  }
+
+  layerTooltip(layer: HealthLayer): string {
+    return `${layer.label}: ${layer.value}. ${layer.help}`;
   }
 
   healthError(health: AgentHealth | null): string {
@@ -318,6 +361,24 @@ ls -l ${socketPath}`,
   lastSeen(agent: Agent): string {
     const fromHealth = this.valueText(this.agentHealth(agent)?.['last_seen_at']);
     return fromHealth === 'unknown' ? (agent.last_seen_at ?? '') : fromHealth;
+  }
+
+  lastSeenLabel(agent: Agent): string {
+    const value = this.lastSeen(agent);
+    if (!value || value === 'unknown') {
+      return 'not reported';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  agentUserLabel(agent: Agent): string {
+    const username = agent.linux_username || 'unknown user';
+    const uid = Number.isFinite(agent.linux_uid) ? `UID ${agent.linux_uid}` : 'UID unknown';
+    return `${username} / ${uid}`;
   }
 
   private async loadAgentHealth(agents: Agent[]): Promise<Record<string, AgentHealth>> {

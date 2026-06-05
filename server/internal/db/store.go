@@ -55,6 +55,17 @@ type CreatedSession struct {
 	Session   Session
 }
 
+type PasskeyCredential struct {
+	ID             string    `json:"id"`
+	UserID         string    `json:"user_id"`
+	CredentialID   string    `json:"credential_id"`
+	Name           string    `json:"name"`
+	CredentialJSON string    `json:"-"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	LastUsedAt     time.Time `json:"last_used_at,omitempty"`
+}
+
 type Agent struct {
 	ID            string    `json:"id"`
 	LinuxUsername string    `json:"linux_username"`
@@ -307,6 +318,99 @@ func (s *Store) FindUserByUsername(ctx context.Context, username string) (User, 
 		return User{}, err
 	}
 	return user, nil
+}
+
+func (s *Store) FindUserByID(ctx context.Context, userID string) (User, error) {
+	var user User
+	err := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash FROM users WHERE id = ?`, userID).
+		Scan(&user.ID, &user.Username, &user.PasswordHash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, ErrNotFound
+		}
+		return User{}, err
+	}
+	return user, nil
+}
+
+func (s *Store) ListPasskeyCredentials(ctx context.Context, userID string) ([]PasskeyCredential, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, user_id, credential_id, name, credential_json, created_at, updated_at, COALESCE(last_used_at, '')
+		FROM passkey_credentials
+		WHERE user_id = ?
+		ORDER BY created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var credentials []PasskeyCredential
+	for rows.Next() {
+		credential, err := scanPasskeyCredential(rows)
+		if err != nil {
+			return nil, err
+		}
+		credentials = append(credentials, credential)
+	}
+	return credentials, rows.Err()
+}
+
+func (s *Store) SavePasskeyCredential(ctx context.Context, userID string, name string, credentialID string, credentialJSON string) (PasskeyCredential, error) {
+	token, err := auth.NewToken()
+	if err != nil {
+		return PasskeyCredential{}, err
+	}
+	now := s.now()
+	credential := PasskeyCredential{
+		ID:             "passkey-" + token[:12],
+		UserID:         userID,
+		CredentialID:   credentialID,
+		Name:           name,
+		CredentialJSON: credentialJSON,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		INSERT INTO passkey_credentials(id, user_id, credential_id, name, credential_json, created_at, updated_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?)`,
+		credential.ID, credential.UserID, credential.CredentialID, credential.Name, credential.CredentialJSON, credential.CreatedAt, credential.UpdatedAt); err != nil {
+		return PasskeyCredential{}, err
+	}
+	return credential, nil
+}
+
+func (s *Store) UpdatePasskeyCredential(ctx context.Context, userID string, credentialID string, credentialJSON string) error {
+	now := s.now()
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE passkey_credentials
+		SET credential_json = ?, updated_at = ?, last_used_at = ?
+		WHERE user_id = ? AND credential_id = ?`,
+		credentialJSON, now, now, userID, credentialID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeletePasskeyCredential(ctx context.Context, userID string, id string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM passkey_credentials WHERE user_id = ? AND id = ?`, userID, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) CreateSession(ctx context.Context, userID string, agentID string, sessionType string, ttl time.Duration) (CreatedSession, error) {
@@ -1198,6 +1302,22 @@ func scanContainer(row scanner) (Container, error) {
 	container.CreatedAt, _ = parseOptionalTime(created)
 	container.ObservedAt, _ = parseTime(observed)
 	return container, nil
+}
+
+func scanPasskeyCredential(row scanner) (PasskeyCredential, error) {
+	var credential PasskeyCredential
+	var created, updated, lastUsed string
+	err := row.Scan(&credential.ID, &credential.UserID, &credential.CredentialID, &credential.Name, &credential.CredentialJSON, &created, &updated, &lastUsed)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return PasskeyCredential{}, ErrNotFound
+		}
+		return PasskeyCredential{}, err
+	}
+	credential.CreatedAt, _ = parseTime(created)
+	credential.UpdatedAt, _ = parseTime(updated)
+	credential.LastUsedAt, _ = parseOptionalTime(lastUsed)
+	return credential, nil
 }
 
 var ErrNotFound = errors.New("not found")

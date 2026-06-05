@@ -46,8 +46,12 @@ func (a *App) setSessionCookie(w http.ResponseWriter, value string, expires time
 		Expires:  expires,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   false,
+		Secure:   a.secureSessionCookies(),
 	})
+}
+
+func (a *App) secureSessionCookies() bool {
+	return a.cfg.Server.UsesHTTPS()
 }
 
 func (a *App) requireCSRF(w http.ResponseWriter, r *http.Request) bool {
@@ -67,18 +71,22 @@ func (a *App) requireCSRF(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (a *App) requireAdminPasswordSession(w http.ResponseWriter, r *http.Request, session db.Session) bool {
-	if session.SessionType != "admin_password" {
-		api.WriteError(r.Context(), w, http.StatusForbidden, "ADMIN_PASSWORD_SESSION_REQUIRED", "Admin password session is required.", nil)
+	if !isAdminSessionType(session.SessionType) {
+		api.WriteError(r.Context(), w, http.StatusForbidden, "ADMIN_SESSION_REQUIRED", "Admin session is required.", nil)
 		return false
 	}
 	return true
 }
 
 func (a *App) canAccessAgent(session db.Session, agentID string) bool {
-	if session.SessionType == "admin_password" {
+	if isAdminSessionType(session.SessionType) {
 		return true
 	}
 	return session.AgentID != "" && session.AgentID == agentID
+}
+
+func isAdminSessionType(sessionType string) bool {
+	return sessionType == "admin_password" || sessionType == "passkey"
 }
 
 func decodeJSON(r *http.Request, w http.ResponseWriter, out any) bool {

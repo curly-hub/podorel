@@ -32,7 +32,7 @@ func TestParseMemoryUsageUnits(t *testing.T) {
 	}
 }
 
-func TestParseCPUPercentAndNormalize(t *testing.T) {
+func TestParseCPUPercent(t *testing.T) {
 	raw, err := ParseCPUPercent("200.00%")
 	if err != nil {
 		t.Fatal(err)
@@ -40,15 +40,12 @@ func TestParseCPUPercentAndNormalize(t *testing.T) {
 	if raw != 200 {
 		t.Fatalf("raw cpu = %f", raw)
 	}
-	if got := NormalizeCPUHostTotal(raw, 4); got != 50 {
-		t.Fatalf("host total cpu = %f, want 50", got)
-	}
 }
 
 func TestParseStatsJSONAndAggregate(t *testing.T) {
 	raw := []byte(`[
-		{"id":"c1","pod":"p1","name":"one","cpu_percent":"100.00%","mem_usage":"1MiB / 1GiB"},
-		{"id":"c2","pod":"p1","name":"two","cpu_percent":"50.00%","mem_usage":"2MiB / 1GiB"}
+		{"id":"c1","pod":"p1","name":"one","cpu_time":"10s","cpu_percent":"100.00%","mem_usage":"1MiB / 1GiB"},
+		{"id":"c2","pod":"p1","name":"two","cpu_time":"20s","cpu_percent":"50.00%","mem_usage":"2MiB / 1GiB"}
 	]`)
 	stats, err := ParseStatsJSON(raw, 4)
 	if err != nil {
@@ -57,16 +54,51 @@ func TestParseStatsJSONAndAggregate(t *testing.T) {
 	if len(stats) != 2 {
 		t.Fatalf("stats = %d, want 2", len(stats))
 	}
-	if stats[0].CPUPercentHostTotal != 25 {
-		t.Fatalf("normalized cpu = %f, want 25", stats[0].CPUPercentHostTotal)
+	if stats[0].CPUPercentHostTotal != 100 {
+		t.Fatalf("cpu = %f, want 100", stats[0].CPUPercentHostTotal)
+	}
+	if stats[0].CPUTimeNanos != int64(10*time.Second) {
+		t.Fatalf("cpu time = %d, want %d", stats[0].CPUTimeNanos, int64(10*time.Second))
 	}
 	aggregated := AggregatePodStats(stats)
 	pod := aggregated["p1"]
-	if pod.CPUPercentHostTotal != 37.5 {
-		t.Fatalf("pod cpu = %f, want 37.5", pod.CPUPercentHostTotal)
+	if pod.CPUPercentHostTotal != 150 {
+		t.Fatalf("pod cpu = %f, want 150", pod.CPUPercentHostTotal)
 	}
 	if pod.MemoryBytes != 3*1024*1024 {
 		t.Fatalf("pod memory = %d", pod.MemoryBytes)
+	}
+}
+
+func TestCPUTrackerUsesCPUTimeDeltas(t *testing.T) {
+	tracker := &CPUTracker{}
+	first := []ContainerStats{{
+		ContainerID:         "c1",
+		Name:                "one",
+		CPUPodmanRaw:        "34.00%",
+		CPUPodmanPercent:    34,
+		CPUPercentHostTotal: 34,
+		CPUTimeNanos:        int64(10 * time.Second),
+	}}
+	first = tracker.Apply(first, time.Unix(100, 0))
+	if first[0].CPUPercentHostTotal != 0 {
+		t.Fatalf("first cpu = %f, want 0", first[0].CPUPercentHostTotal)
+	}
+
+	second := []ContainerStats{{
+		ContainerID:         "c1",
+		Name:                "one",
+		CPUPodmanRaw:        "34.00%",
+		CPUPodmanPercent:    34,
+		CPUPercentHostTotal: 34,
+		CPUTimeNanos:        int64(11 * time.Second),
+	}}
+	second = tracker.Apply(second, time.Unix(102, 0))
+	if second[0].CPUPercentHostTotal != 50 {
+		t.Fatalf("second cpu = %f, want 50", second[0].CPUPercentHostTotal)
+	}
+	if second[0].CPUPodmanRaw != "50.00%" {
+		t.Fatalf("raw cpu = %q, want 50.00%%", second[0].CPUPodmanRaw)
 	}
 }
 

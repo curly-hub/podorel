@@ -54,6 +54,7 @@ type ContainerStats struct {
 	CPUPodmanRaw        string
 	CPUPodmanPercent    float64
 	CPUPercentHostTotal float64
+	CPUTimeNanos        int64
 	MemoryPodmanRaw     string
 	MemoryBytes         uint64
 	MemoryLimitRaw      string

@@ -115,6 +115,24 @@ func TestPasswordLoginSessionCSRFAndMe(t *testing.T) {
 	}
 }
 
+func TestSessionCookieSecureFollowsHTTPSConfig(t *testing.T) {
+	httpsApp := &App{cfg: config.Config{Server: config.ServerConfig{PublicURL: "https://curly-hub.local:9095"}}}
+	rec := httptest.NewRecorder()
+	httpsApp.setSessionCookie(rec, "session-id", time.Now().Add(time.Hour))
+	cookies := rec.Result().Cookies()
+	if len(cookies) != 1 || !cookies[0].Secure {
+		t.Fatalf("https cookie = %#v", cookies)
+	}
+
+	httpApp := &App{cfg: config.Config{Server: config.ServerConfig{PublicURL: "http://localhost:9095"}}}
+	rec = httptest.NewRecorder()
+	httpApp.setSessionCookie(rec, "session-id", time.Now().Add(time.Hour))
+	cookies = rec.Result().Cookies()
+	if len(cookies) != 1 || cookies[0].Secure {
+		t.Fatalf("http cookie = %#v", cookies)
+	}
+}
+
 func TestAgentTokenLoginIsScoped(t *testing.T) {
 	harness := newTestHarness(t)
 	admin := harness.login(t)
