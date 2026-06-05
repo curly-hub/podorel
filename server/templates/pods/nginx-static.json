@@ -1,0 +1,28 @@
+{
+  "id": "nginx-static",
+  "version": "1.0.0",
+  "name": "Nginx Static Web",
+  "description": "Small Nginx pod for static HTTP serving and reverse-proxy smoke tests.",
+  "image": "docker.io/library/nginx:1.27-alpine",
+  "command": [],
+  "ports": [
+    {
+      "host": 8088,
+      "container": 80,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [],
+  "environment": {},
+  "secrets": [],
+  "health_command": ["wget", "-q", "-O", "-", "http://127.0.0.1/"],
+  "resource_limits": {
+    "cpu": "0.5",
+    "memory": "128MiB"
+  },
+  "restart_policy": "on-failure",
+  "labels": {
+    "io.podorel.template": "nginx-static"
+  },
+  "ui_notes": ["Use as a simple public HTTP endpoint before moving to a full application image."]
+}

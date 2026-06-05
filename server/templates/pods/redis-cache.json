@@ -1,0 +1,28 @@
+{
+  "id": "redis-cache",
+  "version": "1.0.0",
+  "name": "Redis Cache",
+  "description": "Single-node Redis cache for local development and lightweight service dependencies.",
+  "image": "docker.io/library/redis:7-alpine",
+  "command": ["redis-server", "--save", "", "--appendonly", "no"],
+  "ports": [
+    {
+      "host": 6379,
+      "container": 6379,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [],
+  "environment": {},
+  "secrets": [],
+  "health_command": ["redis-cli", "ping"],
+  "resource_limits": {
+    "cpu": "0.75",
+    "memory": "256MiB"
+  },
+  "restart_policy": "on-failure",
+  "labels": {
+    "io.podorel.template": "redis-cache"
+  },
+  "ui_notes": ["This template is intentionally ephemeral; add persistence before storing important cache data."]
+}

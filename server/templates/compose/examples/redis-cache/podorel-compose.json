@@ -1,0 +1,25 @@
+{
+  "id": "example-redis-cache",
+  "version": "1.0.0",
+  "name": "Redis Cache Compose",
+  "description": "Single Redis service compose stack for cache and dependency testing.",
+  "source_path": "server/templates/compose/examples/redis-cache",
+  "compose_files": ["docker-compose.yml"],
+  "services": [
+    {
+      "name": "redis",
+      "image": "docker.io/library/redis:7-alpine",
+      "container_name": "podorel-compose-redis",
+      "restart": "unless-stopped",
+      "ports": ["${REDIS_PORT:-6379}:6379"]
+    }
+  ],
+  "environment_files": [".env.example"],
+  "required_files": [],
+  "notes": [
+    "Uses an ephemeral Redis configuration by default. Add persistence before storing important data."
+  ],
+  "labels": {
+    "io.podorel.example": "true"
+  }
+}

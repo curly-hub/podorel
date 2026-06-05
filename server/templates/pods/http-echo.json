@@ -1,0 +1,28 @@
+{
+  "id": "http-echo",
+  "version": "1.0.0",
+  "name": "HTTP Echo",
+  "description": "Tiny HTTP echo service for load balancer, routing, and health-check validation.",
+  "image": "docker.io/hashicorp/http-echo:1.0",
+  "command": ["-listen=:5678", "-text=hello from PoDorel"],
+  "ports": [
+    {
+      "host": 5678,
+      "container": 5678,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [],
+  "environment": {},
+  "secrets": [],
+  "health_command": ["wget", "-q", "-O", "-", "http://127.0.0.1:5678/"],
+  "resource_limits": {
+    "cpu": "0.25",
+    "memory": "64MiB"
+  },
+  "restart_policy": "on-failure",
+  "labels": {
+    "io.podorel.template": "http-echo"
+  },
+  "ui_notes": ["Use for route and proxy checks before deploying a real service."]
+}

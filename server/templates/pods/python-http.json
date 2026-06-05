@@ -1,0 +1,30 @@
+{
+  "id": "python-http",
+  "version": "1.0.0",
+  "name": "Python HTTP Server",
+  "description": "Minimal Python HTTP pod for static file checks, callbacks, and local network tests.",
+  "image": "docker.io/library/python:3.12-alpine",
+  "command": ["python", "-m", "http.server", "8000"],
+  "ports": [
+    {
+      "host": 8082,
+      "container": 8000,
+      "protocol": "tcp"
+    }
+  ],
+  "volumes": [],
+  "environment": {
+    "PYTHONUNBUFFERED": "1"
+  },
+  "secrets": [],
+  "health_command": ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000').read(1)"],
+  "resource_limits": {
+    "cpu": "0.5",
+    "memory": "192MiB"
+  },
+  "restart_policy": "on-failure",
+  "labels": {
+    "io.podorel.template": "python-http"
+  },
+  "ui_notes": ["Good for network smoke tests; replace with an application image for production work."]
+}

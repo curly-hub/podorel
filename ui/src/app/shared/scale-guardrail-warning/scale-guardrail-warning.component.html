@@ -1,0 +1,24 @@
+<section class="scale-guardrail" [class.active]="active">
+  <span class="guardrail-icon">
+    <mat-icon>{{ icon }}</mat-icon>
+  </span>
+  <div class="guardrail-copy">
+    <span>Capacity</span>
+    <strong>{{ title }}</strong>
+    <p>{{ message }}</p>
+  </div>
+  <div class="guardrail-metrics" aria-label="Scale guardrail summary">
+    <span>
+      <strong>{{ totalPods }}</strong>
+      <small>pods</small>
+    </span>
+    <span>
+      <strong>{{ runningPods }}</strong>
+      <small>running</small>
+    </span>
+    <span [class.attention]="active">
+      <strong>{{ uncappedPods }}</strong>
+      <small>uncapped</small>
+    </span>
+  </div>
+</section>
