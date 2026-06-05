@@ -48,6 +48,16 @@ type passkeyBeginResponse struct {
 	PublicKey any    `json:"public_key"`
 }
 
+type passkeyCredentialResponse struct {
+	ID           string     `json:"id"`
+	UserID       string     `json:"user_id"`
+	CredentialID string     `json:"credential_id"`
+	Name         string     `json:"name"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+	LastUsedAt   *time.Time `json:"last_used_at,omitempty"`
+}
+
 type passkeyUser struct {
 	user        db.User
 	credentials []webauthn.Credential
@@ -149,7 +159,7 @@ func (a *App) handleFinishPasskeyRegistration(w http.ResponseWriter, r *http.Req
 		return
 	}
 	a.audit(r, session.UserID, "auth.passkey.register", "passkey", stored.ID, "success", map[string]any{"name": stored.Name})
-	api.WriteOK(r.Context(), w, stored)
+	api.WriteOK(r.Context(), w, passkeyCredentialPayload(stored))
 }
 
 func (a *App) handleBeginPasskeyLogin(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +243,7 @@ func (a *App) handleListPasskeys(w http.ResponseWriter, r *http.Request, session
 	if credentials == nil {
 		credentials = []db.PasskeyCredential{}
 	}
-	api.WriteOK(r.Context(), w, credentials)
+	api.WriteOK(r.Context(), w, passkeyCredentialPayloads(credentials))
 }
 
 func (a *App) handleDeletePasskey(w http.ResponseWriter, r *http.Request, session db.Session) {
@@ -469,6 +479,31 @@ func (a *App) cleanupPasskeyFlowsLocked(now time.Time) {
 
 func credentialIDString(id []byte) string {
 	return base64.RawURLEncoding.EncodeToString(id)
+}
+
+func passkeyCredentialPayloads(credentials []db.PasskeyCredential) []passkeyCredentialResponse {
+	payloads := make([]passkeyCredentialResponse, 0, len(credentials))
+	for _, credential := range credentials {
+		payloads = append(payloads, passkeyCredentialPayload(credential))
+	}
+	return payloads
+}
+
+func passkeyCredentialPayload(credential db.PasskeyCredential) passkeyCredentialResponse {
+	var lastUsed *time.Time
+	if !credential.LastUsedAt.IsZero() {
+		value := credential.LastUsedAt
+		lastUsed = &value
+	}
+	return passkeyCredentialResponse{
+		ID:           credential.ID,
+		UserID:       credential.UserID,
+		CredentialID: credential.CredentialID,
+		Name:         credential.Name,
+		CreatedAt:    credential.CreatedAt,
+		UpdatedAt:    credential.UpdatedAt,
+		LastUsedAt:   lastUsed,
+	}
 }
 
 func defaultPasskeyName(r *http.Request) string {

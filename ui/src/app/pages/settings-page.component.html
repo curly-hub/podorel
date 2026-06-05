@@ -211,11 +211,10 @@
                 <div class="passkey-row-main">
                   <mat-icon>fingerprint</mat-icon>
                   <div>
-                    <strong>{{ passkey.name }}</strong>
-                    <span>Created {{ passkey.created_at | date:'medium' }}</span>
-                    @if (passkey.last_used_at) {
-                      <span>Last used {{ passkey.last_used_at | date:'medium' }}</span>
-                    }
+                    <strong [title]="passkeyTitle(passkey)">{{ passkeyNameLabel(passkey) }}</strong>
+                    <span>{{ passkeyCredentialLabel(passkey) }}</span>
+                    <span>Created {{ passkeyCreatedLabel(passkey) }}</span>
+                    <span>Last used {{ passkeyLastUsedLabel(passkey) }}</span>
                   </div>
                 </div>
                 <button mat-icon-button color="warn" type="button" matTooltip="Remove passkey" [disabled]="passkeyBusy" (click)="deletePasskey(passkey)">

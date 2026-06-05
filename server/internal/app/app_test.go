@@ -220,6 +220,26 @@ func TestTLSCADownloadUnavailable(t *testing.T) {
 	}
 }
 
+func TestPasskeyCredentialPayloadOmitsZeroLastUsed(t *testing.T) {
+	created := time.Date(2026, 6, 5, 18, 36, 37, 0, time.UTC)
+	payload := passkeyCredentialPayload(db.PasskeyCredential{
+		ID:           "passkey-ZEFF_gaPiK_f",
+		UserID:       "admin",
+		CredentialID: "rbzSblRdpbPtdkzZHKghilN9EXyr3IyuMbg9MlBsqJg",
+		Name:         "PoDorel on curly-hub.local",
+		CreatedAt:    created,
+		UpdatedAt:    created,
+	})
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(raw)
+	if strings.Contains(body, "last_used_at") || strings.Contains(body, "0001-01-01") {
+		t.Fatalf("zero last used leaked: %s", body)
+	}
+}
+
 func TestAgentTokenLoginIsScoped(t *testing.T) {
 	harness := newTestHarness(t)
 	admin := harness.login(t)

@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, JsonPipe } from '@angular/common';
+import { JsonPipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,7 +25,7 @@ interface SettingsDraft {
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [DatePipe, FormsModule, JsonPipe, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSnackBarModule, MatTooltipModule],
+  imports: [FormsModule, JsonPipe, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, MatSnackBarModule, MatTooltipModule],
   templateUrl: './settings-page.component.html',
   styleUrls: ['./settings-page.component.scss']
 })
@@ -363,7 +363,7 @@ export class SettingsPageComponent {
     this.passkeyError = '';
     try {
       const passkeys = await this.api.passkeys();
-      this.passkeys = Array.isArray(passkeys) ? passkeys : [];
+      this.passkeys = this.normalizePasskeys(passkeys);
     } catch (error) {
       this.passkeys = [];
       this.passkeyError = this.formatError(error);
@@ -515,6 +515,57 @@ export class SettingsPageComponent {
     this.scheduledScans = !this.scheduledScans;
   }
 
+  passkeyNameLabel(passkey: PasskeyCredential): string {
+    return this.nonEmptyText(passkey.name) || 'Unnamed passkey';
+  }
+
+  passkeyCreatedLabel(passkey: PasskeyCredential): string {
+    return this.dateTimeLabel(passkey.created_at, 'Created date unknown');
+  }
+
+  passkeyLastUsedLabel(passkey: PasskeyCredential): string {
+    return this.dateTimeLabel(passkey.last_used_at, 'Never used');
+  }
+
+  passkeyCredentialLabel(passkey: PasskeyCredential): string {
+    const credential = this.nonEmptyText(passkey.credential_id);
+    if (!credential) {
+      return 'Credential ID unavailable';
+    }
+    return `Credential ${credential.slice(0, 12)}...`;
+  }
+
+  passkeyTitle(passkey: PasskeyCredential): string {
+    const name = this.passkeyNameLabel(passkey);
+    const credential = this.nonEmptyText(passkey.credential_id);
+    return credential ? `${name} · ${credential}` : name;
+  }
+
+  private normalizePasskeys(value: unknown): PasskeyCredential[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value
+      .filter((item): item is PasskeyCredential => this.isPasskeyCredential(item))
+      .map((passkey) => ({
+        ...passkey,
+        name: this.nonEmptyText(passkey.name) || 'Unnamed passkey',
+        last_used_at: this.validDateValue(passkey.last_used_at) ?? null
+      }));
+  }
+
+  private isPasskeyCredential(value: unknown): value is PasskeyCredential {
+    if (value === null || typeof value !== 'object') {
+      return false;
+    }
+    const item = value as Partial<PasskeyCredential>;
+    return typeof item.id === 'string'
+      && typeof item.user_id === 'string'
+      && typeof item.credential_id === 'string'
+      && typeof item.created_at === 'string'
+      && typeof item.updated_at === 'string';
+  }
+
   private currentDraft(): SettingsDraft {
     return {
       execEnabled: this.execEnabled,
@@ -590,6 +641,30 @@ export class SettingsPageComponent {
       return `PoDorel on ${location.hostname}`;
     }
     return 'PoDorel passkey';
+  }
+
+  private dateTimeLabel(value: string | null | undefined, fallback: string): string {
+    const valid = this.validDateValue(value);
+    if (!valid) {
+      return fallback;
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(new Date(valid));
+  }
+
+  private validDateValue(value: string | null | undefined): string | null {
+    const text = this.nonEmptyText(value);
+    if (!text || text.startsWith('0001-01-01')) {
+      return null;
+    }
+    const timestamp = Date.parse(text);
+    return Number.isFinite(timestamp) ? text : null;
+  }
+
+  private nonEmptyText(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
   }
 
   private formatError(error: unknown): string {
