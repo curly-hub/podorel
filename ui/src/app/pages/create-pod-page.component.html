@@ -98,7 +98,7 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Target agent</mat-label>
-                <mat-select [(ngModel)]="agentId">
+                <mat-select [(ngModel)]="agentId" (selectionChange)="onAgentChanged()">
                   <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
                   @for (agent of agents; track agent.id) {
                     <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>
@@ -274,7 +274,7 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Target agent</mat-label>
-                <mat-select [(ngModel)]="agentId">
+                <mat-select [(ngModel)]="agentId" (selectionChange)="onAgentChanged()">
                   <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
                   @for (agent of agents; track agent.id) {
                     <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>
@@ -364,7 +364,7 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Target agent</mat-label>
-                <mat-select [(ngModel)]="agentId">
+                <mat-select [(ngModel)]="agentId" (selectionChange)="onAgentChanged()">
                   <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
                   @for (agent of agents; track agent.id) {
                     <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>
@@ -416,12 +416,19 @@
                 <input matInput [(ngModel)]="secretName">
               </mat-form-field>
               <mat-form-field appearance="outline">
-                <mat-label>Used by pod ID</mat-label>
-                <input matInput [(ngModel)]="secretPodId">
+                <mat-label>Used by pod</mat-label>
+                <mat-select [(ngModel)]="secretPodId">
+                  <mat-option value="">No pod scope</mat-option>
+                  @for (pod of secretPodOptions(); track pod.id) {
+                    <mat-option [value]="pod.id">{{ podOptionLabel(pod) }}</mat-option>
+                  } @empty {
+                    <mat-option disabled>No pods loaded</mat-option>
+                  }
+                </mat-select>
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Target agent</mat-label>
-                <mat-select [(ngModel)]="agentId">
+                <mat-select [(ngModel)]="agentId" (selectionChange)="onAgentChanged()">
                   <mat-option value="">{{ defaultAgentLabel() }}</mat-option>
                   @for (agent of agents; track agent.id) {
                     <mat-option [value]="agent.id">{{ agentOptionLabel(agent) }}</mat-option>

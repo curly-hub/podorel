@@ -10,7 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ApiError, ApiService } from '../core/api.service';
-import { Agent, ComposeStack, PodTemplate } from '../core/models';
+import { Agent, ComposeStack, PodTemplate, PodView } from '../core/models';
 
 type CreateMode = 'template' | 'compose' | 'image' | 'secret';
 
@@ -30,6 +30,7 @@ export class CreatePodPageComponent implements OnInit {
   templates: PodTemplate[] = [];
   composeStacks: ComposeStack[] = [];
   agents: Agent[] = [];
+  pods: PodView[] = [];
   mode: CreateMode = 'template';
   templateId = 'alpine-nodejs';
   templateSearch = '';
@@ -90,14 +91,16 @@ export class CreatePodPageComponent implements OnInit {
   async loadTemplates(): Promise<void> {
     this.error = '';
     try {
-      const [templates, composeStacks, agents] = await Promise.all([
+      const [templates, composeStacks, agents, pods] = await Promise.all([
         this.api.templates(),
         this.api.composeStacks(),
-        this.api.agents().catch(() => [])
+        this.api.agents().catch(() => []),
+        this.api.pods().catch(() => [])
       ]);
       this.templates = templates;
       this.composeStacks = composeStacks;
       this.agents = agents;
+      this.pods = pods;
       if (!this.templates.some((template) => template.id === this.templateId) && this.templates[0]) {
         this.selectTemplate(this.templates[0].id, true);
       } else {
@@ -113,6 +116,12 @@ export class CreatePodPageComponent implements OnInit {
 
   selectMode(mode: CreateMode): void {
     this.mode = mode;
+  }
+
+  onAgentChanged(): void {
+    if (this.secretPodId && !this.secretPodOptions().some((pod) => pod.id === this.secretPodId)) {
+      this.secretPodId = '';
+    }
   }
 
   selectTemplate(templateId: string, resetName = false): void {
@@ -276,6 +285,18 @@ export class CreatePodPageComponent implements OnInit {
     return this.agentId.trim()
       ? 'Runs on the selected registered PoDorel agent.'
       : 'Uses the default agent for this session.';
+  }
+
+  secretPodOptions(): PodView[] {
+    const agent = this.agentId.trim();
+    return this.pods
+      .filter((pod) => !agent || pod.agent_id === agent)
+      .sort((left, right) => this.podOptionLabel(left).localeCompare(this.podOptionLabel(right)));
+  }
+
+  podOptionLabel(pod: PodView): string {
+    const identity = pod.name && pod.name !== pod.id ? `${pod.name} · ${pod.id}` : pod.id;
+    return `${identity} · ${pod.state || 'unknown'}`;
   }
 
   emptyResultTitle(): string {

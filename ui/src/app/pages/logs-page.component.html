@@ -1,126 +1,279 @@
-<section class="page">
-  <header class="page-header">
+<section class="page logs-page">
+  <header class="page-header logs-header">
     <div class="page-title">
       <span class="eyebrow">Observe</span>
       <h1>Logs</h1>
-      <p>Historical log search plus live websocket streaming.</p>
+      <p>Search historical output and watch live container streams from one console.</p>
     </div>
     <div class="header-actions">
-      <button mat-stroked-button type="button" (click)="loadHistory()">
-        <mat-icon>refresh</mat-icon>
-        Refresh
+      <button mat-stroked-button type="button" (click)="loadHistory()" [disabled]="loading()">
+        <mat-icon [class.spin]="loading()">{{ loading() ? 'sync' : 'refresh' }}</mat-icon>
+        {{ loading() ? 'Refreshing' : 'Refresh' }}
       </button>
-      <button mat-stroked-button type="button" (click)="download()">
-        <mat-icon>download</mat-icon>
-        Get Logs
+      <button mat-stroked-button type="button" (click)="download()" [disabled]="downloading()">
+        <mat-icon [class.spin]="downloading()">{{ downloading() ? 'sync' : 'download' }}</mat-icon>
+        {{ downloading() ? 'Preparing' : 'Download' }}
       </button>
-      <button mat-flat-button color="primary" type="button" (click)="connectLive()" [disabled]="connected()">
-        <mat-icon>online_prediction</mat-icon>
-        {{ connected() ? 'Connected' : 'Connect Live' }}
-      </button>
+      @if (connected() || connecting()) {
+        <button mat-stroked-button type="button" (click)="disconnectLive()">
+          <mat-icon>link_off</mat-icon>
+          Disconnect
+        </button>
+      } @else {
+        <button mat-flat-button color="primary" type="button" (click)="connectLive()">
+          <mat-icon>online_prediction</mat-icon>
+          Start live
+        </button>
+      }
     </div>
   </header>
 
   @if (error()) {
     <mat-card class="error-card">
-      <mat-card-content>{{ error() }}</mat-card-content>
+      <mat-card-content>
+        <mat-icon>error</mat-icon>
+        <span>{{ error() }}</span>
+      </mat-card-content>
     </mat-card>
   }
 
-  <mat-card class="warning-card logs-warning-card">
-    <mat-card-content>
-      <mat-icon>warning</mat-icon>
-      <div>
-        <strong>Review logs before sharing</strong>
-        <span>Logs can include hostnames, container names, image names, file paths, and correlation IDs. Click Get Logs to download the current 24-hour selection for support.</span>
-      </div>
-    </mat-card-content>
-  </mat-card>
-
-  <section class="hero-panel logs-hero">
-    <div>
-      <h2>{{ filtered(lines()).length }} historical lines</h2>
-      <p>{{ filtered(liveLines()).length }} live buffered entries. Source filter: {{ source }}.</p>
-    </div>
-    <mat-chip-set class="chip-row">
-      <mat-chip><mat-icon>{{ connected() ? 'wifi' : 'wifi_off' }}</mat-icon>{{ connected() ? 'live connected' : 'live idle' }}</mat-chip>
-      <mat-chip><mat-icon>{{ paused() ? 'pause_circle' : 'play_circle' }}</mat-icon>{{ paused() ? 'paused' : 'flowing' }}</mat-chip>
-    </mat-chip-set>
+  <section class="logs-summary" aria-label="Logs summary">
+    <article class="summary-tile">
+      <span><mat-icon>history</mat-icon>History</span>
+      <strong>{{ filteredHistory().length }}</strong>
+      <small>{{ lines().length }} loaded · {{ historyLoadedAt ? (historyLoadedAt | date: 'mediumTime') : 'not loaded' }}</small>
+    </article>
+    <article class="summary-tile">
+      <span><mat-icon>bolt</mat-icon>Live Buffer</span>
+      <strong>{{ filteredLive().length }}</strong>
+      <small>{{ liveLines().length }} kept · {{ lastLiveAt ? (lastLiveAt | date: 'mediumTime') : 'no live entries' }}</small>
+    </article>
+    <article class="summary-tile">
+      <span><mat-icon>dns</mat-icon>Agent</span>
+      <strong>{{ activeAgentLabel() }}</strong>
+      <small>{{ filterSummary() }}</small>
+    </article>
+    <article class="summary-tile" [class.connected]="connected()" [class.attention]="connecting() || paused()">
+      <span><mat-icon [class.spin]="connecting()">{{ connected() ? 'wifi' : (connecting() ? 'sync' : 'wifi_off') }}</mat-icon>Stream</span>
+      <strong>{{ liveStateLabel() }}</strong>
+      <small>{{ liveStartedAt ? 'since ' + (liveStartedAt | date: 'mediumTime') : 'websocket idle' }}</small>
+    </article>
   </section>
 
-  <mat-card>
-    <mat-card-content class="filters">
-      <mat-form-field appearance="outline">
-        <mat-label>Search</mat-label>
-        <input matInput [(ngModel)]="search" placeholder="Correlation ID, operation, or text">
+  <section class="logs-notice">
+    <mat-icon>privacy_tip</mat-icon>
+    <div>
+      <strong>Review logs before sharing</strong>
+      <span>Logs can include hostnames, container names, image names, file paths, and correlation IDs.</span>
+    </div>
+  </section>
+
+  <section class="logs-workbench">
+    <aside class="panel logs-controls">
+      <header class="panel-heading">
+        <span><mat-icon>tune</mat-icon>Filters</span>
+        <button mat-icon-button type="button" aria-label="Clear log filters" matTooltip="Clear filters" (click)="clearFilters()">
+          <mat-icon>filter_alt_off</mat-icon>
+        </button>
+      </header>
+
+      <mat-form-field appearance="outline" class="wide-field">
+        <mat-label>Search text</mat-label>
+        <input matInput [(ngModel)]="search" placeholder="error, correlation ID, image, path">
       </mat-form-field>
-      <mat-form-field appearance="outline">
+
+      <mat-form-field appearance="outline" class="wide-field">
         <mat-label>Agent</mat-label>
-        <mat-select [(ngModel)]="agentId">
-          <mat-option value="">Current</mat-option>
+        <mat-select [(ngModel)]="agentId" (selectionChange)="onAgentChanged()">
+          <mat-option value="">Current agent</mat-option>
           @for (agent of agents(); track agent.id) {
             <mat-option [value]="agent.id">{{ agent.id }} · {{ agent.status }}</mat-option>
           }
         </mat-select>
       </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Pod ID</mat-label>
-        <input matInput [(ngModel)]="podId">
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Container ID</mat-label>
-        <input matInput [(ngModel)]="containerId">
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Source</mat-label>
-        <mat-select [(ngModel)]="source">
-          <mat-option value="all">All</mat-option>
-          @for (item of sources(); track item) {
-            <mat-option [value]="item">{{ item }}</mat-option>
-          }
-        </mat-select>
-      </mat-form-field>
-      <mat-form-field appearance="outline" class="limit-field">
-        <mat-label>Lines</mat-label>
-        <input matInput type="number" min="1" max="5000" [(ngModel)]="limit">
-      </mat-form-field>
-      <button mat-icon-button type="button" aria-label="Apply log filters" matTooltip="Apply filters" (click)="loadHistory()">
-        <mat-icon>search</mat-icon>
-      </button>
-      <button mat-icon-button type="button" [attr.aria-label]="paused() ? 'Resume logs' : 'Pause logs'" matTooltip="Pause or resume" (click)="togglePause()">
-        <mat-icon>{{ paused() ? 'play_arrow' : 'pause' }}</mat-icon>
-      </button>
-      <button mat-icon-button type="button" aria-label="Download logs" matTooltip="Download selected range" (click)="download()">
-        <mat-icon>download</mat-icon>
-      </button>
-      <button mat-icon-button type="button" aria-label="Clear live buffer" matTooltip="Clear UI buffer" (click)="clearBuffer()">
-        <mat-icon>backspace</mat-icon>
-      </button>
-    </mat-card-content>
-  </mat-card>
 
-  <mat-card>
-    <mat-tab-group>
-      <mat-tab label="Historical 24h">
-        <div class="log-box">
-          @for (line of filtered(lines()); track line.timestamp + line.line) {
-            <code><span>{{ line.timestamp | date: 'mediumTime' }}</span> <strong>{{ line.source }}</strong> {{ line.line }}</code>
-          } @empty {
-            <code>No historical logs match the filter.</code>
-          }
+      <div class="target-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Pod</mat-label>
+          <mat-select [(ngModel)]="podId" (selectionChange)="onPodChanged()">
+            <mat-option value="">All pods</mat-option>
+            @for (pod of podOptions(); track pod.id) {
+              <mat-option [value]="pod.id">{{ podLabel(pod) }}</mat-option>
+            } @empty {
+              <mat-option disabled>No pods loaded</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Container</mat-label>
+          <mat-select [(ngModel)]="containerId" (selectionChange)="onContainerChanged()">
+            <mat-option value="">All containers</mat-option>
+            @for (container of containerOptions(); track container.id) {
+              <mat-option [value]="container.id">{{ containerLabel(container) }}</mat-option>
+            } @empty {
+              <mat-option disabled>No containers loaded</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <div class="target-grid compact">
+        <mat-form-field appearance="outline">
+          <mat-label>Source</mat-label>
+          <mat-select [(ngModel)]="source">
+            <mat-option value="all">All sources</mat-option>
+            @for (item of sources(); track item) {
+              <mat-option [value]="item">{{ item }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Lines</mat-label>
+          <input matInput type="number" min="1" max="5000" [(ngModel)]="limit">
+        </mat-form-field>
+      </div>
+
+      <div class="filter-actions">
+        <button mat-flat-button color="primary" type="button" (click)="applyFilters()" [disabled]="loading()">
+          <mat-icon>search</mat-icon>
+          Apply
+        </button>
+        <button mat-stroked-button type="button" (click)="clearFilters()">
+          <mat-icon>close</mat-icon>
+          Reset
+        </button>
+      </div>
+    </aside>
+
+    <section class="panel stream-panel">
+      <header class="panel-heading">
+        <span><mat-icon>stream</mat-icon>Live Stream</span>
+        <span class="stream-pill" [class.connected]="connected()" [class.attention]="connecting() || paused()">
+          {{ liveStateLabel() }}
+        </span>
+      </header>
+
+      <div class="stream-actions">
+        @if (connected() || connecting()) {
+          <button mat-stroked-button type="button" (click)="disconnectLive()">
+            <mat-icon>link_off</mat-icon>
+            Stop
+          </button>
+        } @else {
+          <button mat-flat-button color="primary" type="button" (click)="connectLive()">
+            <mat-icon>online_prediction</mat-icon>
+            Connect
+          </button>
+        }
+        <button mat-icon-button type="button" [attr.aria-label]="paused() ? 'Resume logs' : 'Pause logs'" matTooltip="Pause or resume" (click)="togglePause()">
+          <mat-icon>{{ paused() ? 'play_arrow' : 'pause' }}</mat-icon>
+        </button>
+        <button mat-icon-button type="button" aria-label="Clear live buffer" matTooltip="Clear live buffer" (click)="clearBuffer()">
+          <mat-icon>backspace</mat-icon>
+        </button>
+        <button mat-icon-button type="button" aria-label="Download selected logs" matTooltip="Download selected logs" (click)="download()" [disabled]="downloading()">
+          <mat-icon>download</mat-icon>
+        </button>
+      </div>
+
+      <dl class="metadata stream-meta">
+        <div>
+          <dt>Target</dt>
+          <dd>{{ selectedTargetLabel() }}</dd>
         </div>
+        <div>
+          <dt>Query</dt>
+          <dd>{{ search.trim() || 'No text filter' }}</dd>
+        </div>
+        <div>
+          <dt>Sources</dt>
+          <dd>{{ sources().length || 0 }} available</dd>
+        </div>
+      </dl>
+    </section>
+  </section>
+
+  <section class="logs-viewer">
+    <mat-tab-group animationDuration="150ms">
+      <mat-tab label="Historical">
+        <section class="log-pane">
+          <header class="log-pane-header">
+            <div>
+              <strong>Historical Logs</strong>
+              <span>{{ filteredHistory().length }} matching lines from {{ lines().length }} loaded.</span>
+            </div>
+            <div class="inline-actions">
+              <button mat-icon-button type="button" aria-label="Refresh historical logs" matTooltip="Refresh history" (click)="loadHistory()" [disabled]="loading()">
+                <mat-icon [class.spin]="loading()">{{ loading() ? 'sync' : 'refresh' }}</mat-icon>
+              </button>
+              <button mat-icon-button type="button" aria-label="Download historical logs" matTooltip="Download history" (click)="download()" [disabled]="downloading()">
+                <mat-icon>download</mat-icon>
+              </button>
+            </div>
+          </header>
+          @if (loading()) {
+            <div class="loading-strip"><mat-icon>sync</mat-icon><span>Refreshing history...</span></div>
+          }
+          <div class="log-table" role="log" aria-label="Historical log entries">
+            @for (line of filteredHistory(); track trackLine($index, line)) {
+              <article class="log-line" [class.tone-danger]="lineTone(line) === 'danger'" [class.tone-warning]="lineTone(line) === 'warning'" [class.tone-success]="lineTone(line) === 'success'">
+                <time>{{ line.timestamp | date: 'HH:mm:ss' }}</time>
+                <span class="log-source" [title]="line.source">{{ line.source || 'unknown' }}</span>
+                <mat-icon>{{ lineIcon(line) }}</mat-icon>
+                <code>{{ line.line }}</code>
+              </article>
+            } @empty {
+              <div class="empty-state">
+                <mat-icon>search_off</mat-icon>
+                <span>No historical logs match the current filters.</span>
+              </div>
+            }
+          </div>
+        </section>
       </mat-tab>
 
       <mat-tab label="Live">
-        <div class="live-toolbar"></div>
-        <div class="log-box">
-          @for (line of filtered(liveLines()); track line.timestamp + line.line) {
-            <code><span>{{ line.timestamp | date: 'mediumTime' }}</span> <strong>{{ line.source }}</strong> {{ line.line }}</code>
-          } @empty {
-            <code>No live log entries in the UI buffer.</code>
-          }
-        </div>
+        <section class="log-pane">
+          <header class="log-pane-header">
+            <div>
+              <strong>Live Buffer</strong>
+              <span>{{ filteredLive().length }} matching entries from {{ liveLines().length }} buffered.</span>
+            </div>
+            <div class="inline-actions">
+              @if (connected() || connecting()) {
+                <button mat-icon-button type="button" aria-label="Disconnect live logs" matTooltip="Disconnect live stream" (click)="disconnectLive()">
+                  <mat-icon>link_off</mat-icon>
+                </button>
+              } @else {
+                <button mat-icon-button type="button" aria-label="Connect live logs" matTooltip="Connect live stream" (click)="connectLive()">
+                  <mat-icon>online_prediction</mat-icon>
+                </button>
+              }
+              <button mat-icon-button type="button" [attr.aria-label]="paused() ? 'Resume logs' : 'Pause logs'" matTooltip="Pause or resume" (click)="togglePause()">
+                <mat-icon>{{ paused() ? 'play_arrow' : 'pause' }}</mat-icon>
+              </button>
+              <button mat-icon-button type="button" aria-label="Clear live buffer" matTooltip="Clear live buffer" (click)="clearBuffer()">
+                <mat-icon>backspace</mat-icon>
+              </button>
+            </div>
+          </header>
+          <div class="log-table live" role="log" aria-label="Live log entries">
+            @for (line of filteredLive(); track trackLine($index, line)) {
+              <article class="log-line" [class.tone-danger]="lineTone(line) === 'danger'" [class.tone-warning]="lineTone(line) === 'warning'" [class.tone-success]="lineTone(line) === 'success'">
+                <time>{{ line.timestamp | date: 'HH:mm:ss' }}</time>
+                <span class="log-source" [title]="line.source">{{ line.source || 'unknown' }}</span>
+                <mat-icon>{{ lineIcon(line) }}</mat-icon>
+                <code>{{ line.line }}</code>
+              </article>
+            } @empty {
+              <div class="empty-state">
+                <mat-icon>rss_feed</mat-icon>
+                <span>No live log entries in the UI buffer.</span>
+              </div>
+            }
+          </div>
+        </section>
       </mat-tab>
     </mat-tab-group>
-  </mat-card>
+  </section>
 </section>
