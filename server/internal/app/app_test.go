@@ -185,6 +185,26 @@ func TestTLSCADownloadDiscoversCAInTLSCertDirectory(t *testing.T) {
 	}
 }
 
+func TestTLSCAInlineDisposition(t *testing.T) {
+	dir := t.TempDir()
+	caPath := filepath.Join(dir, "custom-ca.crt")
+	if err := os.WriteFile(caPath, []byte("ca"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	app := &App{cfg: config.Config{Server: config.ServerConfig{TLSCAFile: caPath}}}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/system/tls-ca?inline=1", nil)
+	rec := httptest.NewRecorder()
+	app.handleTLSCA(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("tls ca status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Disposition"); !strings.Contains(got, `inline; filename="podorel-local-ca.crt"`) {
+		t.Fatalf("content disposition = %q", got)
+	}
+}
+
 func TestTLSCADownloadUnavailable(t *testing.T) {
 	app := &App{}
 	req := httptest.NewRequest(http.MethodGet, "/api/system/tls-ca", nil)

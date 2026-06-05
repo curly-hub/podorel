@@ -150,11 +150,15 @@
             </div>
             <ol>
               <li><strong>1</strong><span>Download the PoDorel local CA certificate.</span></li>
-              <li><strong>2</strong><span>Open the certificate and trust it for websites in this browser or operating system.</span></li>
-              <li><strong>3</strong><span>If it still says not trusted, import the same CA in this browser's certificate manager.</span></li>
+              <li><strong>2</strong><span>In Firefox, import it under Authorities as PoDorel Local CA, then check Trust this CA to identify websites.</span></li>
+              <li><strong>3</strong><span>If it was imported under Servers, People, or Your Certificates, remove it and import it again under Authorities.</span></li>
               <li><strong>4</strong><span>Fully quit and reopen the browser, open PoDorel with HTTPS, then register again.</span></li>
             </ol>
             <div class="trust-actions">
+              <a mat-flat-button color="primary" [href]="firefoxCAImportURL" target="_blank" rel="noopener">
+                <mat-icon>travel_explore</mat-icon>
+                Open CA in Firefox
+              </a>
               <button mat-stroked-button type="button" [disabled]="caDownloadBusy" (click)="downloadLocalCA()">
                 <mat-icon>{{ caDownloadBusy ? 'sync' : 'download' }}</mat-icon>
                 {{ caDownloadBusy ? 'Downloading' : 'Download CA' }}

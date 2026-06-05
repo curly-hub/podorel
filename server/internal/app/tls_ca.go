@@ -29,7 +29,11 @@ func (a *App) handleTLSCA(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-x509-ca-cert")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+localCAFilename+`"`)
+	disposition := "attachment"
+	if r.URL.Query().Get("inline") == "1" {
+		disposition = "inline"
+	}
+	w.Header().Set("Content-Disposition", disposition+`; filename="`+localCAFilename+`"`)
 	http.ServeContent(w, r, localCAFilename, info.ModTime(), file)
 }
 

@@ -51,6 +51,10 @@ export class LoginPageComponent implements OnInit {
     return url.href;
   }
 
+  get firefoxCAImportURL(): string {
+    return '/api/system/tls-ca?inline=1';
+  }
+
   ngOnInit(): void {
     void this.redirectIfAlreadyAuthenticated();
   }

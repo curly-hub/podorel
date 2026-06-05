@@ -52,7 +52,11 @@
         </button>
         @if (showPasskeyTrustHelp) {
           <div class="passkey-help-actions">
-            <span>After trusting the CA, fully quit and reopen the browser. If it still fails, import the CA in this browser's certificate manager.</span>
+            <span>Firefox must trust PoDorel Local CA under Authorities with Trust this CA to identify websites checked. Fully quit and reopen Firefox after importing.</span>
+            <a mat-flat-button color="primary" [href]="firefoxCAImportURL" target="_blank" rel="noopener">
+              <mat-icon>travel_explore</mat-icon>
+              Open CA in Firefox
+            </a>
             <a mat-stroked-button href="/api/system/tls-ca" download>
               <mat-icon>download</mat-icon>
               Download CA

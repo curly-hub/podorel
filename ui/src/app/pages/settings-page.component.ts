@@ -296,6 +296,10 @@ export class SettingsPageComponent {
     return url.href;
   }
 
+  get firefoxCAImportURL(): string {
+    return '/api/system/tls-ca?inline=1';
+  }
+
   get passkeyStatus(): string {
     if (this.passkeyCount === 0) {
       return 'No passkeys registered';
