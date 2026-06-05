@@ -37,6 +37,9 @@ export class SettingsPageComponent {
   passkeyLoading = false;
   passkeysLoaded = false;
   passkeyRawCount = 0;
+  passkeyLoadStartedAt = '';
+  passkeyLoadFinishedAt = '';
+  passkeyLoadElapsedMs = 0;
   passkeyError = '';
   passkeyResult = '';
   caDownloadBusy = false;
@@ -315,7 +318,10 @@ export class SettingsPageComponent {
 
   get passkeyLoadLabel(): string {
     if (this.passkeyLoading) {
-      return 'Loading passkeys from API...';
+      return this.passkeyLoadStartedAt ? `Loading passkeys from API since ${this.passkeyLoadStartedAt}...` : 'Loading passkeys from API...';
+    }
+    if (this.passkeyError) {
+      return `Passkeys failed to load after ${this.elapsedLabel(this.passkeyLoadElapsedMs)}.`;
     }
     if (!this.passkeysLoaded) {
       return 'Passkeys not loaded yet.';
@@ -324,9 +330,9 @@ export class SettingsPageComponent {
       return `API returned ${this.passkeyRawCount} passkey item${this.passkeyRawCount === 1 ? '' : 's'}, but none could be rendered.`;
     }
     if (this.passkeyCount > 0) {
-      return `Loaded ${this.passkeyCount} passkey${this.passkeyCount === 1 ? '' : 's'} from API.`;
+      return `Loaded ${this.passkeyCount} passkey${this.passkeyCount === 1 ? '' : 's'} from API in ${this.elapsedLabel(this.passkeyLoadElapsedMs)}.`;
     }
-    return 'Loaded from API. No passkeys registered.';
+    return `Loaded from API in ${this.elapsedLabel(this.passkeyLoadElapsedMs)}. No passkeys registered.`;
   }
 
   get canManagePasskeys(): boolean {
@@ -356,6 +362,7 @@ export class SettingsPageComponent {
   async load(showFeedback = false): Promise<void> {
     this.error = '';
     this.settingsBusy = true;
+    const passkeysLoad = this.loadPasskeys();
     try {
       const [settings] = await Promise.all([this.api.settings(), this.api.me()]);
       this.settings = settings;
@@ -370,9 +377,10 @@ export class SettingsPageComponent {
       this.savedDraft = this.currentDraft();
     } catch (error) {
       this.error = this.formatError(error);
+    } finally {
+      this.settingsBusy = false;
     }
-    await this.loadPasskeys();
-    this.settingsBusy = false;
+    await passkeysLoad;
     if (showFeedback && !this.error && !this.passkeyError) {
       this.snackBar.open('Settings refreshed.', 'Dismiss', { duration: 2500 });
     }
@@ -381,6 +389,10 @@ export class SettingsPageComponent {
   async loadPasskeys(): Promise<void> {
     this.passkeyError = '';
     this.passkeyLoading = true;
+    this.passkeyLoadElapsedMs = 0;
+    this.passkeyLoadFinishedAt = '';
+    this.passkeyLoadStartedAt = this.timeOnlyLabel(new Date());
+    const started = performance.now();
     try {
       const passkeys = await this.api.passkeys();
       this.passkeys = this.normalizePasskeys(passkeys);
@@ -389,6 +401,8 @@ export class SettingsPageComponent {
       this.passkeyRawCount = 0;
       this.passkeyError = this.formatError(error);
     } finally {
+      this.passkeyLoadElapsedMs = Math.max(1, Math.round(performance.now() - started));
+      this.passkeyLoadFinishedAt = this.timeOnlyLabel(new Date());
       this.passkeysLoaded = true;
       this.passkeyLoading = false;
     }
@@ -695,6 +709,24 @@ export class SettingsPageComponent {
 
   private nonEmptyText(value: unknown): string {
     return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private elapsedLabel(milliseconds: number): string {
+    if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+      return '0ms';
+    }
+    if (milliseconds < 1000) {
+      return `${milliseconds}ms`;
+    }
+    return `${(milliseconds / 1000).toFixed(1)}s`;
+  }
+
+  private timeOnlyLabel(value: Date): string {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).format(value);
   }
 
   private formatError(error: unknown): string {

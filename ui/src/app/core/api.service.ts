@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { ApplicationRef, Injectable, signal } from '@angular/core';
 import {
   Agent,
   ApiEnvelope,
@@ -66,6 +66,9 @@ function labeledValue(label: string, value: unknown): string {
 export class ApiService {
   readonly csrfToken = signal<string>('');
   readonly currentUser = signal<CurrentUser | null>(null);
+  private viewRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(private readonly appRef: ApplicationRef) {}
 
   async login(username: string, password: string): Promise<void> {
     const data = await this.post<{ csrf_token: string; user: CurrentUser }>('/api/auth/login', { username, password }, false);
@@ -89,8 +92,26 @@ export class ApiService {
     this.currentUser.set(data.user);
   }
 
-  passkeys(): Promise<PasskeyCredential[]> {
-    return this.get<PasskeyCredential[]>('/api/auth/passkeys');
+  async passkeys(): Promise<PasskeyCredential[]> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch('/api/auth/passkeys', {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal
+      });
+      return await this.unwrap<PasskeyCredential[]>(response);
+    } catch (error) {
+      if (this.isAbortError(error)) {
+        throw new ApiError('Passkey list request timed out.', 'unavailable', 'REQUEST_TIMEOUT', 408);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+      this.scheduleViewRefresh();
+    }
   }
 
   beginPasskeyRegistration(name: string): Promise<PasskeyBeginResponse> {
@@ -125,11 +146,15 @@ export class ApiService {
   }
 
   async downloadTLSCA(): Promise<Blob> {
-    const response = await fetch('/api/system/tls-ca', { credentials: 'include' });
-    if (!response.ok) {
-      await this.unwrap<never>(response);
+    try {
+      const response = await fetch('/api/system/tls-ca', { credentials: 'include' });
+      if (!response.ok) {
+        await this.unwrap<never>(response);
+      }
+      return response.blob();
+    } finally {
+      this.scheduleViewRefresh();
     }
-    return response.blob();
   }
 
   systemStatus(): Promise<SystemStatus> {
@@ -198,11 +223,15 @@ export class ApiService {
   }
 
   async downloadLogs(params: { agentId?: string; podId?: string; containerId?: string; limit?: number } = {}): Promise<string> {
-    const response = await fetch(`${this.logsPath(params)}&download=true`, { credentials: 'include' });
-    if (!response.ok) {
-      return this.unwrap<string>(response);
+    try {
+      const response = await fetch(`${this.logsPath(params)}&download=true`, { credentials: 'include' });
+      if (!response.ok) {
+        return this.unwrap<string>(response);
+      }
+      return response.text();
+    } finally {
+      this.scheduleViewRefresh();
     }
-    return response.text();
   }
 
   templates(): Promise<PodTemplate[]> {
@@ -288,8 +317,12 @@ export class ApiService {
   }
 
   async get<T>(path: string): Promise<T> {
-    const response = await fetch(path, { credentials: 'include' });
-    return this.unwrap<T>(response);
+    try {
+      const response = await fetch(path, { credentials: 'include' });
+      return await this.unwrap<T>(response);
+    } finally {
+      this.scheduleViewRefresh();
+    }
   }
 
   async post<T>(path: string, body: unknown, includeCsrf = true): Promise<T> {
@@ -320,12 +353,16 @@ export class ApiService {
   }
 
   private async sendMutation<T>(method: 'POST' | 'PUT' | 'DELETE', path: string, body: unknown, includeCsrf: boolean): Promise<T> {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (includeCsrf && this.csrfToken()) {
-      headers['X-CSRF-Token'] = this.csrfToken();
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (includeCsrf && this.csrfToken()) {
+        headers['X-CSRF-Token'] = this.csrfToken();
+      }
+      const response = await fetch(path, { method, credentials: 'include', headers, body: JSON.stringify(body) });
+      return await this.unwrap<T>(response);
+    } finally {
+      this.scheduleViewRefresh();
     }
-    const response = await fetch(path, { method, credentials: 'include', headers, body: JSON.stringify(body) });
-    return this.unwrap<T>(response);
   }
 
   private async ensureCsrfToken(): Promise<void> {
@@ -342,21 +379,43 @@ export class ApiService {
     return error instanceof ApiError && error.status === 403 && (error.code === 'CSRF_REQUIRED' || error.code === 'CSRF_INVALID');
   }
 
+  private isAbortError(error: unknown): boolean {
+    return typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError';
+  }
+
   private async unwrap<T>(response: Response): Promise<T> {
-    let envelope: ApiEnvelope<T>;
     try {
-      envelope = (await response.json()) as ApiEnvelope<T>;
-    } catch {
-      throw new ApiError(`Request failed with ${response.status}`, 'unavailable', 'INVALID_RESPONSE', response.status);
-    }
-    if (!response.ok || !envelope.ok) {
-      const message = envelope.error?.message ?? `Request failed with ${response.status}`;
-      if (response.status === 401) {
-        this.currentUser.set(null);
+      let envelope: ApiEnvelope<T>;
+      try {
+        envelope = (await response.json()) as ApiEnvelope<T>;
+      } catch {
+        throw new ApiError(`Request failed with ${response.status}`, 'unavailable', 'INVALID_RESPONSE', response.status);
       }
-      throw new ApiError(message, envelope.correlation_id, envelope.error?.code ?? 'REQUEST_FAILED', response.status, envelope.error?.details ?? {});
+      if (!response.ok || !envelope.ok) {
+        const message = envelope.error?.message ?? `Request failed with ${response.status}`;
+        if (response.status === 401) {
+          this.currentUser.set(null);
+        }
+        throw new ApiError(message, envelope.correlation_id, envelope.error?.code ?? 'REQUEST_FAILED', response.status, envelope.error?.details ?? {});
+      }
+      return envelope.data as T;
+    } finally {
+      this.scheduleViewRefresh();
     }
-    return envelope.data as T;
+  }
+
+  private scheduleViewRefresh(): void {
+    if (this.viewRefreshTimer !== null) {
+      return;
+    }
+    this.viewRefreshTimer = setTimeout(() => {
+      this.viewRefreshTimer = null;
+      try {
+        this.appRef.tick();
+      } catch {
+        // A tick may already be running; the next scheduled API/user event will refresh the view.
+      }
+    }, 0);
   }
 
   private logsPath(params: { agentId?: string; podId?: string; containerId?: string; limit?: number }): string {

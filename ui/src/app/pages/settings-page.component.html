@@ -127,7 +127,12 @@
 
         <div class="passkey-load-state" [class.good]="passkeyCount > 0" [class.warning]="passkeysLoaded && passkeyRawCount > 0 && passkeyCount === 0">
           <mat-icon>{{ passkeyLoading ? 'sync' : (passkeyCount > 0 ? 'check_circle' : 'info') }}</mat-icon>
-          <span>{{ passkeyLoadLabel }}</span>
+          <span>
+            {{ passkeyLoadLabel }}
+            @if (passkeyError) {
+              <em>{{ passkeyError }}</em>
+            }
+          </span>
           <button mat-icon-button type="button" matTooltip="Reload passkeys" [disabled]="passkeyLoading" (click)="loadPasskeys()">
             <mat-icon>refresh</mat-icon>
           </button>

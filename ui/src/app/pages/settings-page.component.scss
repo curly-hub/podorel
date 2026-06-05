@@ -525,6 +525,15 @@
   overflow-wrap: anywhere;
 }
 
+.passkey-load-state em {
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
 .passkey-load-state button {
   color: inherit;
 }
