@@ -243,7 +243,48 @@ export class SettingsPageComponent {
   }
 
   get showPasskeyTrustHelp(): boolean {
-    return !passkeySecureContext() || this.looksLikePasskeyTrustIssue(this.passkeyError) || this.looksLikePasskeyTrustIssue(this.passkeyWarning);
+    return true;
+  }
+
+  get passkeySetupTone(): string {
+    if (this.agentScopedSession) {
+      return 'warning';
+    }
+    if (!passkeySecureContext()) {
+      return 'danger';
+    }
+    if (!passkeysSupported()) {
+      return 'warning';
+    }
+    return 'good';
+  }
+
+  get passkeySetupTitle(): string {
+    if (this.passkeyReady && !this.agentScopedSession) {
+      return 'Passkey setup is ready';
+    }
+    return 'Trust PoDorel for passkeys';
+  }
+
+  get passkeySetupDetail(): string {
+    if (this.agentScopedSession) {
+      return 'Sign in as the admin user to manage passkeys.';
+    }
+    if (!passkeySecureContext()) {
+      return 'This browser still does not trust the current HTTPS origin.';
+    }
+    if (!passkeysSupported()) {
+      return 'This browser session does not expose the passkey API.';
+    }
+    return 'The browser reports a secure context and passkey support.';
+  }
+
+  get secureContextLabel(): string {
+    return passkeySecureContext() ? 'trusted by browser' : 'not trusted yet';
+  }
+
+  get passkeySupportLabel(): string {
+    return passkeysSupported() ? 'available' : 'unavailable';
   }
 
   get currentHTTPSURL(): string {
@@ -545,10 +586,6 @@ export class SettingsPageComponent {
       return `PoDorel on ${location.hostname}`;
     }
     return 'PoDorel passkey';
-  }
-
-  private looksLikePasskeyTrustIssue(message: string): boolean {
-    return /local ca|insecure|unsecure|unsecured|secure browser context|not trusted/i.test(message);
   }
 
   private formatError(error: unknown): string {

@@ -126,18 +126,33 @@
         }
 
         @if (showPasskeyTrustHelp) {
-          <div class="passkey-trust-panel">
+          <div class="passkey-trust-panel" [class.good]="passkeySetupTone === 'good'" [class.warning]="passkeySetupTone === 'warning'" [class.danger]="passkeySetupTone === 'danger'">
             <header>
               <mat-icon>verified_user</mat-icon>
               <div>
-                <strong>Trust PoDorel for passkeys</strong>
-                <span>Browsers require the local CA to be trusted before passkeys can run on this HTTPS origin.</span>
+                <strong>{{ passkeySetupTitle }}</strong>
+                <span>{{ passkeySetupDetail }}</span>
               </div>
             </header>
+            <div class="trust-status-grid">
+              <article [class.good]="!accessedOverHttp" [class.danger]="accessedOverHttp">
+                <span>Page</span>
+                <strong>{{ accessedOverHttp ? 'HTTP' : 'HTTPS' }}</strong>
+              </article>
+              <article [class.good]="passkeyReady || secureContextLabel === 'trusted by browser'" [class.danger]="secureContextLabel !== 'trusted by browser'">
+                <span>Browser trust</span>
+                <strong>{{ secureContextLabel }}</strong>
+              </article>
+              <article [class.good]="passkeySupportLabel === 'available'" [class.warning]="passkeySupportLabel !== 'available'">
+                <span>Passkey API</span>
+                <strong>{{ passkeySupportLabel }}</strong>
+              </article>
+            </div>
             <ol>
               <li><strong>1</strong><span>Download the PoDorel local CA certificate.</span></li>
               <li><strong>2</strong><span>Open the certificate and trust it for websites in this browser or operating system.</span></li>
-              <li><strong>3</strong><span>Reopen PoDorel with HTTPS, then register the passkey again.</span></li>
+              <li><strong>3</strong><span>If it still says not trusted, import the same CA in this browser's certificate manager.</span></li>
+              <li><strong>4</strong><span>Fully quit and reopen the browser, open PoDorel with HTTPS, then register again.</span></li>
             </ol>
             <div class="trust-actions">
               <button mat-stroked-button type="button" [disabled]="caDownloadBusy" (click)="downloadLocalCA()">

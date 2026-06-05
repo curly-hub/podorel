@@ -75,7 +75,7 @@ export function credentialToJSON(credential: PublicKeyCredential): Record<string
 export function passkeyUnavailableMessage(): string {
   if (!passkeySecureContext()) {
     const origin = typeof location !== 'undefined' ? location.origin : 'this origin';
-    return `Passkeys need a trusted secure browser context. ${origin} is not trusted by this browser yet. Trust the PoDorel local CA certificate, then reopen PoDorel over HTTPS.`;
+    return `Passkeys need a trusted secure browser context. ${origin} is not trusted by this browser yet. Trust the PoDorel local CA certificate in this browser or operating system, fully reopen the browser, then open PoDorel over HTTPS.`;
   }
   if (!passkeysSupported()) {
     return 'This browser does not support passkeys.';

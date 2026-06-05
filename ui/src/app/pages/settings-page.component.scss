@@ -347,6 +347,21 @@
   padding: 14px;
 }
 
+.passkey-trust-panel.good {
+  background: color-mix(in srgb, var(--success) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+}
+
+.passkey-trust-panel.warning {
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--warning) 32%, var(--border));
+}
+
+.passkey-trust-panel.danger {
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
 .passkey-trust-panel header {
   align-items: flex-start;
   display: flex;
@@ -411,6 +426,49 @@
   justify-content: center;
   line-height: 1;
   width: 24px;
+}
+
+.trust-status-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.trust-status-grid article {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.trust-status-grid article.good {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border));
+}
+
+.trust-status-grid article.warning {
+  border-color: color-mix(in srgb, var(--warning) 36%, var(--border));
+}
+
+.trust-status-grid article.danger {
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+}
+
+.trust-status-grid span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.trust-status-grid strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.25;
 }
 
 .trust-actions {
@@ -858,6 +916,10 @@ pre {
   .section-status {
     max-width: 100%;
     width: max-content;
+  }
+
+  .trust-status-grid {
+    grid-template-columns: 1fr;
   }
 
   .passkey-enroll {

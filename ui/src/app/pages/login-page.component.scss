@@ -109,6 +109,14 @@
   min-height: 40px;
 }
 
+.passkey-help-actions span {
+  color: var(--text-soft);
+  flex: 1 0 100%;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .passkey-copy div {
   display: grid;
   gap: 2px;
