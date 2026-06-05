@@ -22,54 +22,83 @@
   <a href="docs/security.md">Security</a>
   ·
   <a href="docs/architecture.md">Architecture</a>
+  ·
+  <a href="docs/limitations.md">Limits</a>
 </p>
-
-<table>
-  <tr>
-    <td><strong>Local-first</strong><br>Designed for a Linux user running rootless Podman, not a distant control plane.</td>
-    <td><strong>Visible operations</strong><br>Pods, containers, logs, metrics, agents, scans, audit logs, and diagnostics in one place.</td>
-    <td><strong>Practical guardrails</strong><br>HTTPS-ready config, passkeys, CSRF protection, memory visibility, scale warnings, and admin-gated actions.</td>
-  </tr>
-  <tr>
-    <td><strong>Templates and Compose</strong><br>Create repeatable pods and deploy Compose stacks without copy-paste shell drift.</td>
-    <td><strong>Agent model</strong><br>A per-user host agent talks to the correct rootless Podman socket or CLI.</td>
-    <td><strong>Small-team friendly</strong><br>Useful for home labs, dev hosts, internal tools, and edge boxes where Kubernetes is too much.</td>
-  </tr>
-</table>
 
 ![PoDorel product presentation banner](docs/podorel-presentation-preview.svg)
 
-PoDorel is a local web console for rootless Podman pods. It gives a single
-Linux user a browser UI for pod and container lifecycle actions, logs, basic
-stats, templates, Compose stack deployment, security scan results, audit logs,
-and diagnostics.
+PoDorel is a local web console for rootless Podman pods. It gives a Linux user
+a browser UI for lifecycle actions, logs, resource stats, pod templates, Compose
+stack deployment, security scan results, image digest checks, audit logs,
+settings, agents, and diagnostics.
 
-PoDorel runs as two cooperating pieces: a Go web/API service in a rootless
-Podman pod, and a per-user host agent that talks to the user's rootless Podman
-socket or CLI. State is stored in SQLite. The UI is built with Angular Material.
+PoDorel is intentionally local-first. It is not a Kubernetes replacement and it
+does not require a remote control plane. It gives rootless Podman a practical,
+human-facing operations surface.
 
-## Product Presentation
+## Why PoDorel
 
-Want the quick, attractive overview first? Open the
-[PoDorel presentation](docs/podorel-presentation.md) for a GitHub-rendered
-visual pitch covering the problem, product, architecture, and ideal users.
+| Need | What PoDorel gives you |
+| --- | --- |
+| Clear state | Dashboard, pod cards, container detail, logs, stats, agent health, diagnostics, and audit history. |
+| Safer operations | HTTPS-ready config, passkeys, CSRF protection, admin-gated settings, scale warnings, memory visibility, and audit events. |
+| Repeatable creation | Pod templates, Compose stack deployment, Dockerfile builds, secrets metadata, and reusable examples. |
+| Rootless by design | A per-user host agent talks to the correct rootless Podman socket or CLI without turning the web UI into root. |
+| Small-team practicality | Useful for home labs, dev hosts, internal tools, and edge boxes where a full cluster is too much. |
 
-## For Users
+## Highlights
 
-### Supported Systems
+- **Pods and containers:** start, stop, restart, kill, inspect, and delete.
+- **Logs:** browse recent logs and download support-friendly log windows.
+- **Stats:** CPU and memory visibility with clearer resource-limit context.
+- **Templates:** create pods from curated templates with safer defaults.
+- **Compose:** deploy Compose stacks from reviewed templates.
+- **Agents:** inspect web, token, socket, agent API, and Podman health layers.
+- **Security:** scan status, image digest checks, host package updates, and audit logs.
+- **Settings:** operations toggles, retention controls, HTTPS posture, passkeys, and unsaved-change visibility.
+- **Diagnostics:** runtime profile, traces, support bundles, and correlation IDs.
 
-The v1 installer supports Debian, Ubuntu, and Fedora. Unsupported distributions
-fail fast with a clear message.
+## Architecture
 
-PoDorel serves HTTP by default on a LAN-oriented address. Put it behind a trusted
-reverse proxy, VPN, or tunnel if you need HTTPS or remote access.
+PoDorel runs as two cooperating pieces:
 
-### Install
+| Piece | Role |
+| --- | --- |
+| Go web/API service | Serves the UI, API, auth, audit, settings, SQLite state, templates, and diagnostics. |
+| Per-user host agent | Runs beside the Linux user and talks to that user's rootless Podman socket or CLI. |
+| SQLite | Stores sessions, agents, audit events, scans, settings, templates, and local metadata. |
+| Angular UI | Provides the browser console for daily operations. |
 
-Install from a fresh clone on the target machine. Run this as the Linux user
-that should own rootless Podman; the installer will ask for sudo when it needs
-system-level changes. If you are already in a root shell, pass
-`--target-user USER`.
+The web/API service is installed in a rootless Podman pod. The host agent stays
+outside the pod because it needs access to the user's Podman socket and local
+Unix socket.
+
+## HTTPS And Passkeys
+
+PoDorel can serve native HTTPS when both TLS files are configured:
+
+```bash
+PODOREL_TLS_CERT_FILE=/path/to/podorel.crt \
+PODOREL_TLS_KEY_FILE=/path/to/podorel.key \
+./install.sh --yes --public-url https://podorel.lan:9095
+```
+
+When native TLS is enabled, PoDorel redirects HTTP requests on the same public
+port to HTTPS. If TLS terminates in a reverse proxy instead, set the public URL
+to `https://...` and enable trusted proxy mode only for a proxy you control.
+
+Passkeys require a browser-secure context. Use `https://...` with a certificate
+trusted by the browser, or `localhost` for development. If you use a local CA,
+trust the CA in your OS/browser before registering a passkey.
+
+## Install
+
+Supported installer targets: Debian, Ubuntu, and Fedora.
+
+Install from a fresh clone on the target machine as the Linux user that should
+own rootless Podman. The installer asks for sudo only when it needs system-level
+changes. If you are already root, pass `--target-user USER`.
 
 ```bash
 git clone https://github.com/curly-hub/podorel.git
@@ -77,30 +106,30 @@ cd podorel
 ./install.sh --yes --public-url http://podorel.lan:8080
 ```
 
-If the public URL includes an explicit port, such as
-`http://curly-hub.local:9095`, the installer publishes and listens on that port
-unless `--listen-addr` is also supplied. On Fedora with firewalld running, the
-installer also opens that TCP port; set `PODOREL_SKIP_FIREWALL=1` to skip it.
-Other firewalls may still need a manual allow rule.
+Use HTTPS by providing TLS files and an HTTPS public URL:
 
-Check the installation plan without changing the machine:
+```bash
+PODOREL_TLS_CERT_FILE=/home/alice/.local/share/podorel/tls/podorel.crt \
+PODOREL_TLS_KEY_FILE=/home/alice/.local/share/podorel/tls/podorel.key \
+./install.sh --yes --public-url https://podorel.lan:9095
+```
+
+Preview the install plan without changing the machine:
 
 ```bash
 ./install.sh --dry-run --yes
 ```
 
-If `--admin-password` is omitted, the installer generates a password and writes
-it to `~/.config/podorel/generated-admin-password` for the target user. Sign in
-with username `admin` and that password.
+If `--admin-password` is omitted, the installer generates one and writes it to
+`~/.config/podorel/generated-admin-password` for the target user. Sign in with
+username `admin`.
 
-### What Gets Installed
+If the public URL includes an explicit port, such as
+`https://curly-hub.local:9095`, the installer publishes and listens on that port
+unless `--listen-addr` is also supplied. On Fedora with firewalld running, the
+installer opens that TCP port unless `PODOREL_SKIP_FIREWALL=1` is set.
 
-The installer creates a rootless Podman pod named `podorel` for the web/API
-container and installs the host agent as a systemd user service. The agent stays
-outside the web pod because it needs access to the user's Podman socket and host
-Unix socket.
-
-### Day-to-Day Commands
+## Day-To-Day Commands
 
 After installation, the `podorel` CLI wraps common local operations:
 
@@ -117,16 +146,16 @@ podorel doctor
 More operational notes are in [docs/operations.md](docs/operations.md).
 Troubleshooting notes are in [docs/troubleshooting.md](docs/troubleshooting.md).
 
-### Current Scope
+## Current Scope
 
 PoDorel is an early v1 project. The core local Podman workflow is implemented
-and tested, but some production-hardening and UI depth are still evolving. See
+and tested, but production-hardening and UI depth are still evolving. Read
 [docs/limitations.md](docs/limitations.md) before relying on it for important
 production workloads.
 
 ## For Developers
 
-### Repository Layout
+Repository layout:
 
 - `server/`: Go web/API server, SQLite migrations, templates, and embedded UI support.
 - `agent/`: host-side user agent and Podman runtime adapters.
@@ -136,9 +165,7 @@ production workloads.
 - `scripts/`: install, deploy, test, and export entrypoints.
 - `docs/`: architecture, operations, security, troubleshooting, and known limits.
 
-### Run Checks
-
-Development and source installs require a Go 1.23-compatible toolchain.
+Run the main check suite:
 
 ```bash
 scripts/test-all.sh
@@ -149,9 +176,7 @@ checks, the Angular build when `ui/node_modules` is installed, shell syntax
 checks, packaging checks, and installer/deployment dry runs. Real Podman
 integration tests are opt-in with `PODOREL_RUN_REAL_PODMAN_TESTS=1`.
 
-### Run Locally
-
-Start the local development stack on HTTP localhost:
+Run the development stack:
 
 ```bash
 scripts/deploy-dev.sh
@@ -168,28 +193,28 @@ Development defaults to `http://localhost:8080` for the Go web/API server and
 `http://localhost:4200` for the Angular dev server. The development admin login
 is `admin` with password `podorel-development-password`.
 
-### Build a Deploy Bundle
+Build a deploy bundle:
 
 ```bash
 scripts/build-deploy.sh --force
 ```
 
 The generated `deploy/podorel-.../` folder and matching `.tar.gz` include
-prebuilt binaries, the Angular UI, migrations, pod templates, compose examples,
+prebuilt binaries, the Angular UI, migrations, pod templates, Compose examples,
 systemd units, and `install.sh`. GitHub Actions can produce the same archive
-with `.github/workflows/build-deploy.yml`.
+with [.github/workflows/build-deploy.yml](.github/workflows/build-deploy.yml).
 
-Create a clean git-ready copy outside this working tree with:
+Create a clean git-ready copy outside this working tree:
 
 ```bash
 scripts/git-export.sh --target ../PoDorel-git-ready
 ```
 
-### Compose Templates
+## Compose Templates
 
 Docker Compose migration details are in
 [docs/docker-compose-migration.md](docs/docker-compose-migration.md). To scan an
-existing Docker/Portainer-style tree into PoDorel compose templates, use:
+existing Docker/Portainer-style tree into PoDorel Compose templates, use:
 
 ```bash
 scripts/import-compose-stacks.sh --source /path/to/docker-projects
