@@ -1,4 +1,43 @@
-# PoDorel
+<p align="center">
+  <img src="ui/public/logo.svg" alt="PoDorel" width="220">
+</p>
+
+<h1 align="center">PoDorel</h1>
+
+<p align="center">
+  <strong>The calm control room for rootless Podman.</strong>
+</p>
+
+<p align="center">
+  Operate pods, inspect logs, deploy templates and Compose stacks, watch
+  resource usage, check security posture, and troubleshoot local Podman hosts
+  from one focused web console.
+</p>
+
+<p align="center">
+  <a href="docs/podorel-presentation.html"><strong>Open the presentation deck</strong></a>
+  ·
+  <a href="docs/operations.md">Operations</a>
+  ·
+  <a href="docs/security.md">Security</a>
+  ·
+  <a href="docs/architecture.md">Architecture</a>
+</p>
+
+<table>
+  <tr>
+    <td><strong>Local-first</strong><br>Designed for a Linux user running rootless Podman, not a distant control plane.</td>
+    <td><strong>Visible operations</strong><br>Pods, containers, logs, metrics, agents, scans, audit logs, and diagnostics in one place.</td>
+    <td><strong>Practical guardrails</strong><br>HTTPS-ready config, passkeys, CSRF protection, memory visibility, scale warnings, and admin-gated actions.</td>
+  </tr>
+  <tr>
+    <td><strong>Templates and Compose</strong><br>Create repeatable pods and deploy Compose stacks without copy-paste shell drift.</td>
+    <td><strong>Agent model</strong><br>A per-user host agent talks to the correct rootless Podman socket or CLI.</td>
+    <td><strong>Small-team friendly</strong><br>Useful for home labs, dev hosts, internal tools, and edge boxes where Kubernetes is too much.</td>
+  </tr>
+</table>
+
+![PoDorel product flow](docs/podorel-presentation-preview.svg)
 
 PoDorel is a local web console for rootless Podman pods. It gives a single
 Linux user a browser UI for pod and container lifecycle actions, logs, basic
