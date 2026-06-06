@@ -398,6 +398,11 @@ func (a *App) handleCreateFromTemplate(w http.ResponseWriter, r *http.Request, s
 			preview = append(preview, "-p", strconv.Itoa(port.Host)+":"+strconv.Itoa(port.Container)+"/"+port.Protocol)
 		}
 	}
+	for _, volume := range template.Volumes {
+		if spec := templateVolumeSpec(volume); spec != "" {
+			preview = append(preview, "-v", spec)
+		}
+	}
 	for _, key := range sortedStringMapKeys(template.Environment) {
 		value := template.Environment[key]
 		preview = append(preview, "-e", key+"="+value)
@@ -690,6 +695,7 @@ func sanitizeName(input string) string {
 
 func applyTemplateValues(template templates.Template, values map[string]string) (templates.Template, error) {
 	template.Command = append([]string(nil), template.Command...)
+	template.Volumes = append([]templates.Volume(nil), template.Volumes...)
 	template.Environment = cloneStringMap(template.Environment)
 	template.Labels = cloneStringMap(template.Labels)
 	if len(values) == 0 {
@@ -712,6 +718,10 @@ func applyTemplateValues(template templates.Template, values map[string]string) 
 	for i := range template.Command {
 		template.Command[i] = replace(template.Command[i])
 	}
+	for i := range template.Volumes {
+		template.Volumes[i].HostPath = replace(template.Volumes[i].HostPath)
+		template.Volumes[i].ContainerPath = replace(template.Volumes[i].ContainerPath)
+	}
 	for i := range template.Ports {
 		override, ok, err := templatePortValue(values, template.Ports[i].Container, len(template.Ports) == 1)
 		if err != nil {
@@ -728,6 +738,19 @@ func applyTemplateValues(template templates.Template, values map[string]string) 
 		template.Labels[key] = replace(value)
 	}
 	return template, nil
+}
+
+func templateVolumeSpec(volume templates.Volume) string {
+	hostPath := strings.TrimSpace(volume.HostPath)
+	containerPath := strings.TrimSpace(volume.ContainerPath)
+	if hostPath == "" || containerPath == "" {
+		return ""
+	}
+	spec := hostPath + ":" + containerPath
+	if volume.ReadOnly {
+		spec += ":ro"
+	}
+	return spec
 }
 
 func templatePortValue(values map[string]string, containerPort int, singlePort bool) (int, bool, error) {

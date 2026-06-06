@@ -180,7 +180,7 @@ export class PodsPageComponent implements OnInit {
       return 'No live Podman stats yet';
     }
     const noun = stats.containerCount === 1 ? 'container' : 'containers';
-    return `Live Podman stats · ${stats.containerCount} ${noun} sampled`;
+    return `${stats.containerCount} ${noun} sampled`;
   }
 
   containerStateSummary(pod: PodView): string {

@@ -71,6 +71,7 @@ func LoadDir(dir string) ([]Template, error) {
 		if err := json.Unmarshal(content, &template); err != nil {
 			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
 		}
+		template.Normalize()
 		if err := template.Validate(); err != nil {
 			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
 		}
@@ -80,6 +81,33 @@ func LoadDir(dir string) ([]Template, error) {
 		return loaded[i].ID < loaded[j].ID
 	})
 	return loaded, nil
+}
+
+func (t *Template) Normalize() {
+	if t.Command == nil {
+		t.Command = []string{}
+	}
+	if t.Ports == nil {
+		t.Ports = []Port{}
+	}
+	if t.Volumes == nil {
+		t.Volumes = []Volume{}
+	}
+	if t.Environment == nil {
+		t.Environment = map[string]string{}
+	}
+	if t.Secrets == nil {
+		t.Secrets = []SecretRef{}
+	}
+	if t.HealthCommand == nil {
+		t.HealthCommand = []string{}
+	}
+	if t.Labels == nil {
+		t.Labels = map[string]string{}
+	}
+	if t.UINotes == nil {
+		t.UINotes = []string{}
+	}
 }
 
 func (t Template) Validate() error {

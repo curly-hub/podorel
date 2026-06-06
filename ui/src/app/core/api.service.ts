@@ -126,6 +126,17 @@ export class ApiService {
     return this.delete<Record<string, unknown>>(`/api/auth/passkeys/${encodeURIComponent(id)}`, {});
   }
 
+  async changeAdminPassword(currentPassword: string, newPassword: string): Promise<Record<string, unknown>> {
+    const data = await this.post<{ changed: boolean; user?: CurrentUser }>('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword
+    });
+    if (data.user) {
+      this.currentUser.set(data.user);
+    }
+    return data;
+  }
+
   async logout(): Promise<void> {
     await this.post<Record<string, unknown>>('/api/auth/logout', {});
     this.csrfToken.set('');
@@ -234,12 +245,14 @@ export class ApiService {
     }
   }
 
-  templates(): Promise<PodTemplate[]> {
-    return this.get<PodTemplate[]>('/api/templates');
+  async templates(): Promise<PodTemplate[]> {
+    const templates = await this.get<PodTemplate[]>('/api/templates');
+    return templates.map((template) => this.normalizePodTemplate(template));
   }
 
-  composeStacks(): Promise<ComposeStack[]> {
-    return this.get<ComposeStack[]>('/api/compose-stacks');
+  async composeStacks(): Promise<ComposeStack[]> {
+    const stacks = await this.get<ComposeStack[]>('/api/compose-stacks');
+    return stacks.map((stack) => this.normalizeComposeStack(stack));
   }
 
   deployComposeStack(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -377,6 +390,39 @@ export class ApiService {
 
   private isCsrfError(error: unknown): boolean {
     return error instanceof ApiError && error.status === 403 && (error.code === 'CSRF_REQUIRED' || error.code === 'CSRF_INVALID');
+  }
+
+  private normalizePodTemplate(template: PodTemplate): PodTemplate {
+    return {
+      ...template,
+      command: Array.isArray(template.command) ? template.command : [],
+      ports: Array.isArray(template.ports) ? template.ports : [],
+      volumes: Array.isArray(template.volumes) ? template.volumes : [],
+      environment: template.environment ?? {},
+      secrets: Array.isArray(template.secrets) ? template.secrets : [],
+      health_command: Array.isArray(template.health_command) ? template.health_command : [],
+      resource_limits: template.resource_limits ?? { cpu: '', memory: '' },
+      labels: template.labels ?? {},
+      ui_notes: Array.isArray(template.ui_notes) ? template.ui_notes : []
+    };
+  }
+
+  private normalizeComposeStack(stack: ComposeStack): ComposeStack {
+    return {
+      ...stack,
+      compose_files: Array.isArray(stack.compose_files) ? stack.compose_files : [],
+      services: Array.isArray(stack.services)
+        ? stack.services.map((service) => ({
+            ...service,
+            ports: Array.isArray(service.ports) ? service.ports : undefined,
+            profiles: Array.isArray(service.profiles) ? service.profiles : undefined
+          }))
+        : [],
+      environment_files: Array.isArray(stack.environment_files) ? stack.environment_files : [],
+      required_files: Array.isArray(stack.required_files) ? stack.required_files : [],
+      notes: Array.isArray(stack.notes) ? stack.notes : [],
+      labels: stack.labels ?? {}
+    };
   }
 
   private isAbortError(error: unknown): boolean {

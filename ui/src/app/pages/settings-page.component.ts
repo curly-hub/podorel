@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { JsonPipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
@@ -61,14 +61,43 @@ export class SettingsPageComponent {
   lastUpdatedKeys: string[] = [];
   requiresRestart = false;
   error = '';
+  passwordCurrent = '';
+  passwordNew = '';
+  passwordConfirm = '';
+  passwordChanging = false;
+  passwordChangeMessage = '';
+  passwordChangeWarning = false;
   private savedDraft: SettingsDraft | null = null;
 
-  constructor(private readonly api: ApiService, private readonly snackBar: MatSnackBar) {
+  constructor(private readonly api: ApiService, private readonly snackBar: MatSnackBar, private readonly cdr: ChangeDetectorRef) {
     void this.load();
   }
 
   get accessedOverHttp(): boolean {
     return typeof location !== 'undefined' && location.protocol === 'http:';
+  }
+
+  get canChangeAdminPassword(): boolean {
+    const sessionType = this.api.currentUser()?.session_type;
+    return sessionType === 'admin_password' || sessionType === 'passkey';
+  }
+
+  get passwordChangeRequired(): boolean {
+    return this.api.currentUser()?.password_change_required === true;
+  }
+
+  get passwordChangeReasonLabel(): string {
+    const reasons = this.api.currentUser()?.password_change_reasons ?? [];
+    if (reasons.includes('configured_password') && reasons.includes('no_passkey')) {
+      return 'The admin password still matches the configured bootstrap password and no passkey is registered.';
+    }
+    if (reasons.includes('configured_password')) {
+      return 'The admin password still matches the configured bootstrap password.';
+    }
+    if (reasons.includes('no_passkey')) {
+      return 'No passkey is registered, so a distinct admin password is required.';
+    }
+    return 'Change the admin password before continuing.';
   }
 
   get httpsMode(): string {
@@ -379,11 +408,13 @@ export class SettingsPageComponent {
       this.error = this.formatError(error);
     } finally {
       this.settingsBusy = false;
+      this.cdr.detectChanges();
     }
     await passkeysLoad;
     if (showFeedback && !this.error && !this.passkeyError) {
       this.snackBar.open('Settings refreshed.', 'Dismiss', { duration: 2500 });
     }
+    this.cdr.detectChanges();
   }
 
   async loadPasskeys(): Promise<void> {
@@ -405,6 +436,7 @@ export class SettingsPageComponent {
       this.passkeyLoadFinishedAt = this.timeOnlyLabel(new Date());
       this.passkeysLoaded = true;
       this.passkeyLoading = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -432,6 +464,7 @@ export class SettingsPageComponent {
       this.snackBar.open(this.passkeyError, 'Dismiss', { duration: 6500 });
     } finally {
       this.passkeyBusy = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -456,6 +489,7 @@ export class SettingsPageComponent {
       this.snackBar.open(this.passkeyError, 'Dismiss', { duration: 6500 });
     } finally {
       this.caDownloadBusy = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -472,6 +506,7 @@ export class SettingsPageComponent {
       this.caResult = `Open ${url}`;
     }
     this.snackBar.open(this.caResult, 'Dismiss', { duration: 4500 });
+    this.cdr.detectChanges();
   }
 
   async deletePasskey(passkey: PasskeyCredential): Promise<void> {
@@ -489,6 +524,40 @@ export class SettingsPageComponent {
       this.snackBar.open(this.passkeyError, 'Dismiss', { duration: 6500 });
     } finally {
       this.passkeyBusy = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  async changeAdminPassword(): Promise<void> {
+    this.passwordChangeMessage = '';
+    this.passwordChangeWarning = false;
+    if (this.passwordCurrent.trim() === '') {
+      this.passwordChangeMessage = 'Enter the current admin password.';
+      this.passwordChangeWarning = true;
+      this.cdr.detectChanges();
+      return;
+    }
+    if (this.passwordNew !== this.passwordConfirm) {
+      this.passwordChangeMessage = 'New password and confirmation do not match.';
+      this.passwordChangeWarning = true;
+      this.cdr.detectChanges();
+      return;
+    }
+    this.passwordChanging = true;
+    try {
+      await this.api.changeAdminPassword(this.passwordCurrent, this.passwordNew);
+      this.passwordCurrent = '';
+      this.passwordNew = '';
+      this.passwordConfirm = '';
+      this.passwordChangeMessage = 'Admin password changed.';
+      this.snackBar.open(this.passwordChangeMessage, 'Dismiss', { duration: 3500 });
+    } catch (error) {
+      this.passwordChangeMessage = this.formatError(error);
+      this.passwordChangeWarning = true;
+      this.snackBar.open(this.passwordChangeMessage, 'Dismiss', { duration: 6500 });
+    } finally {
+      this.passwordChanging = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -501,6 +570,7 @@ export class SettingsPageComponent {
       this.lastUpdatedKeys = [];
       this.requiresRestart = false;
       this.snackBar.open(this.saveMessage, 'Dismiss', { duration: 5000 });
+      this.cdr.detectChanges();
       return;
     }
     this.saving = true;
@@ -538,6 +608,7 @@ export class SettingsPageComponent {
       this.snackBar.open(this.error, 'Dismiss', { duration: 7000 });
     } finally {
       this.saving = false;
+      this.cdr.detectChanges();
     }
   }
 

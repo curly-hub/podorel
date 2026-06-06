@@ -1,7 +1,9 @@
 package templates
 
 import (
+	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -19,6 +21,16 @@ func TestBuiltInTemplatesLoad(t *testing.T) {
 	for _, template := range loaded {
 		if _, ok := want[template.ID]; ok {
 			want[template.ID] = true
+		}
+		if template.Command == nil || template.Ports == nil || template.Volumes == nil || template.Environment == nil || template.Secrets == nil || template.HealthCommand == nil || template.Labels == nil || template.UINotes == nil {
+			t.Fatalf("%s has an unnormalized nil collection", template.ID)
+		}
+		content, err := json.Marshal(template)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(content), ":null") {
+			t.Fatalf("%s serialized a null collection: %s", template.ID, string(content))
 		}
 	}
 	for id, seen := range want {

@@ -315,6 +315,10 @@ export interface CurrentUser {
   username?: string;
   session_type: string;
   agent_id?: string;
+  password_change_required?: boolean;
+  password_change_reasons?: string[];
+  using_configured_password?: boolean;
+  passkeys_registered?: number;
   [key: string]: unknown;
 }
 

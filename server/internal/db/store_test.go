@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -64,6 +65,49 @@ func TestBootstrapUsesConfiguredPrimaryAgentSocket(t *testing.T) {
 	}
 	if agent.SocketPath != "/tmp/podorel-dev/podorel-agent.sock" {
 		t.Fatalf("primary socket path = %q", agent.SocketPath)
+	}
+}
+
+func TestUpdateUserPasswordAndPasskeyCount(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+	if err := store.Bootstrap(ctx, DefaultAdminPassword); err != nil {
+		t.Fatal(err)
+	}
+	count, err := store.CountPasskeyCredentials(ctx, DefaultAdminUsername)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("passkey count = %d, want 0", count)
+	}
+
+	if err := store.UpdateUserPassword(ctx, DefaultAdminUsername, "changed-admin-password"); err != nil {
+		t.Fatal(err)
+	}
+	user, err := store.FindUserByUsername(ctx, DefaultAdminUsername)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if auth.VerifyPassword(DefaultAdminPassword, user.PasswordHash) {
+		t.Fatal("old admin password still verifies after update")
+	}
+	if !auth.VerifyPassword("changed-admin-password", user.PasswordHash) {
+		t.Fatal("new admin password hash did not verify")
+	}
+	if err := store.UpdateUserPassword(ctx, "missing-user", "changed-admin-password"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing user update err = %v, want ErrNotFound", err)
+	}
+
+	if _, err := store.SavePasskeyCredential(ctx, DefaultAdminUsername, "Laptop", "credential-id", `{"id":"credential-id"}`); err != nil {
+		t.Fatal(err)
+	}
+	count, err = store.CountPasskeyCredentials(ctx, DefaultAdminUsername)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("passkey count after save = %d, want 1", count)
 	}
 }
 

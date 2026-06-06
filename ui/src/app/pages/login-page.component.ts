@@ -86,7 +86,7 @@ export class LoginPageComponent implements OnInit {
     this.error = '';
     try {
       await work();
-      await this.router.navigateByUrl(this.destinationUrl());
+      await this.router.navigateByUrl(this.postLoginUrl());
     } catch (error) {
       this.error = this.formatError(error);
     } finally {
@@ -97,7 +97,7 @@ export class LoginPageComponent implements OnInit {
   private async redirectIfAlreadyAuthenticated(): Promise<void> {
     try {
       await this.api.me();
-      await this.router.navigateByUrl(this.destinationUrl());
+      await this.router.navigateByUrl(this.postLoginUrl());
     } catch {
       this.api.currentUser.set(null);
     }
@@ -109,6 +109,14 @@ export class LoginPageComponent implements OnInit {
       return '/dashboard';
     }
     return returnUrl;
+  }
+
+  private postLoginUrl(): string {
+    const user = this.api.currentUser();
+    if (user?.password_change_required === true && user.session_type !== 'agent_token') {
+      return '/settings?changePassword=1';
+    }
+    return this.destinationUrl();
   }
 
   private formatError(error: unknown): string {

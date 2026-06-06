@@ -143,10 +143,10 @@
                 }
               </div>
               <div class="row-actions">
-                <button mat-icon-button type="button" matTooltip="Check health" [disabled]="refreshing()" (click)="$event.stopPropagation(); checkHealth(agent)">
+                <button mat-icon-button type="button" aria-label="Check health" matTooltip="Check health" [disabled]="refreshing()" (click)="$event.stopPropagation(); checkHealth(agent)">
                   <mat-icon>monitor_heart</mat-icon>
                 </button>
-                <button mat-icon-button color="warn" type="button" matTooltip="Rotate token" (click)="$event.stopPropagation(); rotate(agent)">
+                <button mat-icon-button color="warn" type="button" aria-label="Rotate token" matTooltip="Rotate token" (click)="$event.stopPropagation(); rotate(agent)">
                   <mat-icon>vpn_key</mat-icon>
                 </button>
               </div>

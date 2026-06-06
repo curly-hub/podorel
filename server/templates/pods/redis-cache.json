@@ -2,9 +2,9 @@
   "id": "redis-cache",
   "version": "1.0.0",
   "name": "Redis Cache",
-  "description": "Single-node Redis cache for local development and lightweight service dependencies.",
+  "description": "Single-node Redis cache with an append-only persistent data volume.",
   "image": "docker.io/library/redis:7-alpine",
-  "command": ["redis-server", "--save", "", "--appendonly", "no"],
+  "command": ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"],
   "ports": [
     {
       "host": 6379,
@@ -12,7 +12,13 @@
       "protocol": "tcp"
     }
   ],
-  "volumes": [],
+  "volumes": [
+    {
+      "host_path": "podorel-redis-cache-data",
+      "container_path": "/data",
+      "read_only": false
+    }
+  ],
   "environment": {},
   "secrets": [],
   "health_command": ["redis-cli", "ping"],
@@ -20,9 +26,9 @@
     "cpu": "0.75",
     "memory": "256MiB"
   },
-  "restart_policy": "on-failure",
+  "restart_policy": "unless-stopped",
   "labels": {
     "io.podorel.template": "redis-cache"
   },
-  "ui_notes": ["This template is intentionally ephemeral; add persistence before storing important cache data."]
+  "ui_notes": ["Cache data persists in the podorel-redis-cache-data volume; back up that volume before relying on it for important data."]
 }

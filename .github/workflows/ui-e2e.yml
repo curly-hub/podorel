@@ -1,0 +1,62 @@
+name: UI E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  full-ui-e2e:
+    name: Full UI flow coverage
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman curl
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Run full UI E2E
+        working-directory: ui
+        env:
+          GOCACHE: ${{ runner.temp }}/go-cache
+          PODOREL_E2E_DIR: ${{ runner.temp }}/podorel-ui-e2e
+        run: npm run e2e:dev
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: podorel-ui-e2e-artifacts
+          if-no-files-found: ignore
+          path: |
+            ui/test-results
+            ui/playwright-report
+            ${{ runner.temp }}/podorel-ui-e2e/logs
+            ${{ runner.temp }}/podorel-ui-e2e/dev-status.json

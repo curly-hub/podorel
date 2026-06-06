@@ -3,6 +3,8 @@ scripts/redeploy-prod.local.sh
 reports/
 ui/node_modules/
 ui/dist/
+ui/test-results/
+ui/playwright-report/
 deploy/
 ui/.angular/
 bin/

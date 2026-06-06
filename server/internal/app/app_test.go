@@ -115,6 +115,94 @@ func TestPasswordLoginSessionCSRFAndMe(t *testing.T) {
 	}
 }
 
+func TestAdminPasswordChangeStatusAndEndpoint(t *testing.T) {
+	harness := newTestHarness(t)
+
+	req := jsonRequest(http.MethodPost, "/api/auth/login", `{"username":"admin","password":"secret-password"}`)
+	rec := httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	cookie := rec.Result().Cookies()[0]
+	csrf := stringFieldFromEnvelope(t, rec.Body.Bytes(), "csrf_token")
+	user := mapFieldFromEnvelope(t, rec.Body.Bytes(), "user")
+	if user["password_change_required"] != true {
+		t.Fatalf("password_change_required = %#v", user["password_change_required"])
+	}
+	if user["using_configured_password"] != true {
+		t.Fatalf("using_configured_password = %#v", user["using_configured_password"])
+	}
+	if got, _ := user["passkeys_registered"].(float64); got != 0 {
+		t.Fatalf("passkeys_registered = %#v, want 0", user["passkeys_registered"])
+	}
+	reasons := stringSliceField(t, user, "password_change_reasons")
+	if !containsString(reasons, "configured_password") || !containsString(reasons, "no_passkey") {
+		t.Fatalf("password change reasons = %#v", reasons)
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/auth/change-password", `{"current_password":"secret-password","new_password":"changed-admin-password-123"}`)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("missing csrf status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/auth/change-password", `{"current_password":"wrong","new_password":"changed-admin-password-123"}`)
+	req.AddCookie(cookie)
+	req.Header.Set(csrfHeaderName, csrf)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "ADMIN_PASSWORD_INVALID") {
+		t.Fatalf("wrong current password status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/auth/change-password", `{"current_password":"secret-password","new_password":"short"}`)
+	req.AddCookie(cookie)
+	req.Header.Set(csrfHeaderName, csrf)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "PASSWORD_INVALID") {
+		t.Fatalf("short password status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/auth/change-password", `{"current_password":"secret-password","new_password":"changed-admin-password-123"}`)
+	req.AddCookie(cookie)
+	req.Header.Set(csrfHeaderName, csrf)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("change password status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	user = mapFieldFromEnvelope(t, rec.Body.Bytes(), "user")
+	if user["using_configured_password"] != false {
+		t.Fatalf("using_configured_password after change = %#v", user["using_configured_password"])
+	}
+	reasons = stringSliceField(t, user, "password_change_reasons")
+	if containsString(reasons, "configured_password") || !containsString(reasons, "no_passkey") {
+		t.Fatalf("password change reasons after change = %#v", reasons)
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/auth/login", `{"username":"admin","password":"secret-password"}`)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("old password login status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/auth/login", `{"username":"admin","password":"changed-admin-password-123"}`)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("new password login status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	user = mapFieldFromEnvelope(t, rec.Body.Bytes(), "user")
+	if user["using_configured_password"] != false {
+		t.Fatalf("new login using_configured_password = %#v", user["using_configured_password"])
+	}
+}
+
 func TestSessionCookieSecureFollowsHTTPSConfig(t *testing.T) {
 	httpsApp := &App{cfg: config.Config{Server: config.ServerConfig{PublicURL: "https://curly-hub.local:9095"}}}
 	rec := httptest.NewRecorder()
@@ -310,6 +398,9 @@ func TestTemplatesSecuritySecretsAndAudit(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "alpine-nodejs") {
 		t.Fatalf("templates response = %d %s", rec.Code, rec.Body.String())
 	}
+	if strings.Contains(rec.Body.String(), `"command":null`) {
+		t.Fatalf("templates response should normalize empty command arrays: %s", rec.Body.String())
+	}
 
 	req = jsonRequest(http.MethodPost, "/api/security/scan", `{}`)
 	req.AddCookie(login.Cookie)
@@ -413,6 +504,15 @@ func TestCreateFromTemplateAndDockerfilePreview(t *testing.T) {
 	harness.handler.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "preview_command") || !strings.Contains(rec.Body.String(), "--detach") || !strings.Contains(rec.Body.String(), "31080:3000/tcp") || !strings.Contains(rec.Body.String(), "setInterval") {
 		t.Fatalf("template preview = %d %s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/pods/create-from-template", `{"template_id":"redis-cache","pod_name":"redis-demo"}`)
+	req.AddCookie(login.Cookie)
+	req.Header.Set(csrfHeaderName, login.CSRFToken)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "podorel-redis-cache-data:/data") || !strings.Contains(rec.Body.String(), "--appendonly") {
+		t.Fatalf("redis template preview = %d %s", rec.Code, rec.Body.String())
 	}
 
 	req = jsonRequest(http.MethodPost, "/api/pods/create-from-template", `{"template_id":"alpine-nodejs","pod_name":"node-demo","values":{"host_port":"not-a-port"}}`)
@@ -996,6 +1096,53 @@ func stringFieldFromEnvelope(t *testing.T, body []byte, key string) string {
 	}
 	value, _ := payload[key].(string)
 	return value
+}
+
+func mapFieldFromEnvelope(t *testing.T, body []byte, key string) map[string]any {
+	t.Helper()
+	var envelope api.Envelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(envelope.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatal(err)
+	}
+	value, ok := payload[key].(map[string]any)
+	if !ok {
+		t.Fatalf("envelope field %q = %#v, want object", key, payload[key])
+	}
+	return value
+}
+
+func stringSliceField(t *testing.T, payload map[string]any, key string) []string {
+	t.Helper()
+	rawValues, ok := payload[key].([]any)
+	if !ok {
+		t.Fatalf("payload field %q = %#v, want array", key, payload[key])
+	}
+	values := make([]string, 0, len(rawValues))
+	for _, rawValue := range rawValues {
+		value, ok := rawValue.(string)
+		if !ok {
+			t.Fatalf("payload field %q contains %#v, want string", key, rawValue)
+		}
+		values = append(values, value)
+	}
+	return values
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
 }
 
 type ioDiscard struct{}

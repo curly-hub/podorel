@@ -10,7 +10,7 @@
         <mat-icon>refresh</mat-icon>
         Refresh
       </button>
-      <button mat-flat-button color="primary" routerLink="/create-pod">
+      <button mat-flat-button color="primary" type="button" routerLink="/create-pod">
         <mat-icon>rocket_launch</mat-icon>
         Create Pod
       </button>
@@ -92,7 +92,7 @@
                   <mat-chip><mat-icon>restart_alt</mat-icon>{{ template.restart_policy }}</mat-chip>
                 </mat-chip-set>
                 <footer>
-                  <button mat-stroked-button type="button" [routerLink]="['/create-pod']" [queryParams]="{ template: template.id }">
+                  <button mat-stroked-button type="button" routerLink="/create-pod" [queryParams]="{ template: template.id }">
                     <mat-icon>rocket_launch</mat-icon>
                     Use
                   </button>
@@ -148,7 +148,7 @@
                   </ul>
                 }
                 <footer>
-                  <button mat-stroked-button type="button" [routerLink]="['/create-pod']" [queryParams]="{ mode: 'compose', stack: stack.id }">
+                  <button mat-stroked-button type="button" routerLink="/create-pod" [queryParams]="{ mode: 'compose', stack: stack.id }">
                     <mat-icon>publish</mat-icon>
                     Deploy
                   </button>

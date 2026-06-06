@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { DatePipe, JsonPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -47,7 +47,7 @@ export class DiagnosticsPageComponent implements OnInit {
   redacted = false;
   loading = false;
 
-  constructor(private readonly api: ApiService) {}
+  constructor(private readonly api: ApiService, private readonly cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     void this.refresh();
@@ -72,6 +72,7 @@ export class DiagnosticsPageComponent implements OnInit {
       }
     } finally {
       this.loading = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -130,6 +131,8 @@ export class DiagnosticsPageComponent implements OnInit {
       }
     } catch (error) {
       this.error = this.formatError(error);
+    } finally {
+      this.cdr.detectChanges();
     }
   }
 
@@ -145,6 +148,7 @@ export class DiagnosticsPageComponent implements OnInit {
       this.error = this.formatError(error);
     } finally {
       this.supportLogsBusy = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -168,6 +172,8 @@ export class DiagnosticsPageComponent implements OnInit {
       this.bundle = await this.api.diagnosticsBundle({ password: this.adminPassword });
     } catch (error) {
       this.error = this.formatError(error);
+    } finally {
+      this.cdr.detectChanges();
     }
   }
 

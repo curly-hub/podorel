@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -56,11 +56,12 @@ export class CreatePodPageComponent implements OnInit {
   error = '';
   private buildSocket?: WebSocket;
 
-  constructor(private readonly api: ApiService, private readonly route: ActivatedRoute) {}
+  constructor(private readonly api: ApiService, private readonly route: ActivatedRoute, private readonly cdr: ChangeDetectorRef) {}
 
   async ngOnInit(): Promise<void> {
     await this.loadTemplates();
     this.applyRouteState();
+    this.cdr.detectChanges();
   }
 
   get selectedTemplate(): PodTemplate | undefined {
@@ -111,6 +112,8 @@ export class CreatePodPageComponent implements OnInit {
       }
     } catch (error) {
       this.error = this.formatError(error);
+    } finally {
+      this.cdr.detectChanges();
     }
   }
 
@@ -158,9 +161,10 @@ export class CreatePodPageComponent implements OnInit {
     if (!template) {
       return [];
     }
+    const command = Array.isArray(template.command) ? template.command : [];
     const values = [
       template.image,
-      ...template.command,
+      ...command,
       ...Object.values(template.environment ?? {}),
       ...Object.values(template.labels ?? {})
     ];
@@ -184,19 +188,19 @@ export class CreatePodPageComponent implements OnInit {
   }
 
   templatePortValue(port: PodTemplate['ports'][number]): string {
-    return this.templatePortValues[this.templatePortKey(port)] ?? String(port.host || '');
+    return this.valueText(this.templatePortValues[this.templatePortKey(port)] ?? port.host);
   }
 
-  setTemplatePortValue(port: PodTemplate['ports'][number], value: string): void {
-    this.templatePortValues[this.templatePortKey(port)] = value;
+  setTemplatePortValue(port: PodTemplate['ports'][number], value: unknown): void {
+    this.templatePortValues[this.templatePortKey(port)] = this.valueText(value);
   }
 
   templateVariableValue(key: string): string {
-    return this.templateVariableValues[key] ?? '';
+    return this.valueText(this.templateVariableValues[key]);
   }
 
-  setTemplateVariableValue(key: string, value: string): void {
-    this.templateVariableValues[key] = value;
+  setTemplateVariableValue(key: string, value: unknown): void {
+    this.templateVariableValues[key] = this.valueText(value);
   }
 
   addTemplateValueRow(): void {
@@ -368,6 +372,7 @@ export class CreatePodPageComponent implements OnInit {
       agent_id: this.agentId || undefined
     }));
     this.secretValue = '';
+    this.cdr.detectChanges();
   }
 
   private applyRouteState(): void {
@@ -424,13 +429,13 @@ export class CreatePodPageComponent implements OnInit {
     const values: Record<string, string> = {};
     for (const port of this.selectedTemplate?.ports ?? []) {
       const key = this.templatePortKey(port);
-      const value = (this.templatePortValues[key] ?? '').trim();
+      const value = this.valueText(this.templatePortValues[key]).trim();
       if (value) {
         values[key] = value;
       }
     }
     for (const key of this.templateVariables()) {
-      const value = (this.templateVariableValues[key] ?? '').trim();
+      const value = this.valueText(this.templateVariableValues[key]).trim();
       if (value) {
         values[key] = value;
       }
@@ -453,12 +458,15 @@ export class CreatePodPageComponent implements OnInit {
     socket.onmessage = (event) => {
       const payload = JSON.parse(event.data) as Record<string, unknown>;
       this.result = JSON.stringify(payload['build'] ?? payload, null, 2);
+      this.cdr.detectChanges();
     };
     socket.onerror = () => {
       this.buildStreamStatus = `Build stream failed for ${buildId}`;
+      this.cdr.detectChanges();
     };
     socket.onclose = () => {
       this.buildStreamStatus = `Build stream closed for ${buildId}`;
+      this.cdr.detectChanges();
     };
   }
 
@@ -473,6 +481,7 @@ export class CreatePodPageComponent implements OnInit {
       this.error = this.formatError(error);
     } finally {
       this.executing = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -486,5 +495,12 @@ export class CreatePodPageComponent implements OnInit {
       return `${error.message} Correlation ID: ${error.correlationId}`;
     }
     return 'Create request failed.';
+  }
+
+  private valueText(value: unknown): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    return String(value);
   }
 }

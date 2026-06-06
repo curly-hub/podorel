@@ -29,6 +29,16 @@
     </section>
   }
 
+  @if (passwordChangeRequired) {
+    <section class="settings-alert warning">
+      <mat-icon>admin_panel_settings</mat-icon>
+      <div>
+        <strong>Change admin password</strong>
+        <span>{{ passwordChangeReasonLabel }}</span>
+      </div>
+    </section>
+  }
+
   @if (error) {
     <section class="settings-alert danger">
       <mat-icon>error</mat-icon>
@@ -133,7 +143,7 @@
               <em>{{ passkeyError }}</em>
             }
           </span>
-          <button mat-icon-button type="button" matTooltip="Reload passkeys" [disabled]="passkeyLoading" (click)="loadPasskeys()">
+          <button mat-icon-button type="button" aria-label="Reload passkeys" matTooltip="Reload passkeys" [disabled]="passkeyLoading" (click)="loadPasskeys()">
             <mat-icon>refresh</mat-icon>
           </button>
         </div>
@@ -151,7 +161,7 @@
                     <span>Last used {{ passkeyLastUsedLabel(passkey) }}</span>
                   </div>
                 </div>
-                <button mat-icon-button color="warn" type="button" matTooltip="Remove passkey" [disabled]="passkeyBusy" (click)="deletePasskey(passkey)">
+                <button mat-icon-button color="warn" type="button" aria-label="Remove passkey" matTooltip="Remove passkey" [disabled]="passkeyBusy" (click)="deletePasskey(passkey)">
                   <mat-icon>delete</mat-icon>
                 </button>
               </article>
@@ -206,7 +216,7 @@
                 <mat-icon>open_in_new</mat-icon>
                 Open HTTPS
               </a>
-              <button mat-icon-button type="button" matTooltip="Copy HTTPS URL" (click)="copyHTTPSURL()">
+              <button mat-icon-button type="button" aria-label="Copy HTTPS URL" matTooltip="Copy HTTPS URL" (click)="copyHTTPSURL()">
                 <mat-icon>content_copy</mat-icon>
               </button>
             </div>
@@ -353,6 +363,54 @@
     </main>
 
     <aside class="settings-sidebar">
+      @if (canChangeAdminPassword) {
+        <section class="save-panel" [class.dirty]="passwordChangeRequired">
+          <header class="section-heading">
+            <span><mat-icon>admin_panel_settings</mat-icon>Admin password</span>
+            <span class="section-status" [class.warning]="passwordChangeRequired" [class.good]="!passwordChangeRequired">{{ passwordChangeRequired ? 'required' : 'available' }}</span>
+          </header>
+
+          @if (passwordChangeRequired) {
+            <div class="dirty-banner">
+              <mat-icon>warning</mat-icon>
+              <div>
+                <strong>Action required</strong>
+                <span>{{ passwordChangeReasonLabel }}</span>
+              </div>
+            </div>
+          }
+
+          <mat-form-field appearance="outline">
+            <mat-label>Current admin password</mat-label>
+            <input matInput type="password" [(ngModel)]="passwordCurrent" autocomplete="current-password">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>New admin password</mat-label>
+            <input matInput type="password" [(ngModel)]="passwordNew" autocomplete="new-password">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Confirm new admin password</mat-label>
+            <input matInput type="password" [(ngModel)]="passwordConfirm" autocomplete="new-password">
+          </mat-form-field>
+
+          <button mat-flat-button color="primary" type="button" [disabled]="passwordChanging" (click)="changeAdminPassword()">
+            <mat-icon>{{ passwordChanging ? 'sync' : 'lock_reset' }}</mat-icon>
+            {{ passwordChanging ? 'Changing' : 'Change password' }}
+          </button>
+
+          @if (passwordChangeMessage) {
+            <div class="save-feedback" [class.warning]="passwordChangeWarning">
+              <mat-icon>{{ passwordChangeWarning ? 'warning' : 'check_circle' }}</mat-icon>
+              <div>
+                <strong>{{ passwordChangeMessage }}</strong>
+              </div>
+            </div>
+          }
+        </section>
+      }
+
       <section class="save-panel" [class.dirty]="hasUnsavedChanges">
         <header class="section-heading">
           <span><mat-icon>save</mat-icon>Save</span>

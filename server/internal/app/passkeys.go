@@ -226,7 +226,7 @@ func (a *App) handleFinishPasskeyLogin(w http.ResponseWriter, r *http.Request) {
 	a.setSessionCookie(w, created.SessionID, created.Session.ExpiresAt)
 	a.audit(r, user.user.ID, "auth.login.passkey", "user", user.user.ID, "success", nil)
 	api.WriteOK(r.Context(), w, map[string]any{
-		"user":       map[string]any{"id": user.user.ID, "username": user.user.Username, "session_type": passkeySessionType},
+		"user":       a.currentUserPayload(r.Context(), user.user.ID, user.user.Username, passkeySessionType, ""),
 		"csrf_token": created.CSRFToken,
 	})
 }

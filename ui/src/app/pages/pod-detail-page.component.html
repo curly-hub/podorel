@@ -106,12 +106,12 @@
                       <mat-chip><mat-icon>memory</mat-icon>{{ containerMemoryLabel(container) }}</mat-chip>
                     </mat-chip-set>
                     <div class="container-actions">
-                      <button mat-icon-button matTooltip="Shell" [routerLink]="['/containers', container.id]" [queryParams]="{ tab: 'shell' }" [disabled]="!canOpenShell(container)"><mat-icon>terminal</mat-icon></button>
-                      <button mat-icon-button matTooltip="Start" [disabled]="!canContainerAction(container, 'start')" (click)="containerAction(container, 'start')"><mat-icon>play_arrow</mat-icon></button>
-                      <button mat-icon-button matTooltip="Stop" [disabled]="!canContainerAction(container, 'stop')" (click)="containerAction(container, 'stop')"><mat-icon>stop</mat-icon></button>
-                      <button mat-icon-button matTooltip="Restart" [disabled]="!canContainerAction(container, 'restart')" (click)="containerAction(container, 'restart')"><mat-icon>restart_alt</mat-icon></button>
-                      <button mat-icon-button color="warn" matTooltip="Kill" [disabled]="!canContainerAction(container, 'kill')" (click)="containerAction(container, 'kill')"><mat-icon>dangerous</mat-icon></button>
-                      <button mat-icon-button color="warn" matTooltip="Delete" [disabled]="!canContainerAction(container, 'delete')" (click)="containerAction(container, 'delete')"><mat-icon>delete</mat-icon></button>
+                      <button mat-icon-button aria-label="Open shell" matTooltip="Shell" [routerLink]="['/containers', container.id]" [queryParams]="{ tab: 'shell' }" [disabled]="!canOpenShell(container)"><mat-icon>terminal</mat-icon></button>
+                      <button mat-icon-button aria-label="Start container" matTooltip="Start" [disabled]="!canContainerAction(container, 'start')" (click)="containerAction(container, 'start')"><mat-icon>play_arrow</mat-icon></button>
+                      <button mat-icon-button aria-label="Stop container" matTooltip="Stop" [disabled]="!canContainerAction(container, 'stop')" (click)="containerAction(container, 'stop')"><mat-icon>stop</mat-icon></button>
+                      <button mat-icon-button aria-label="Restart container" matTooltip="Restart" [disabled]="!canContainerAction(container, 'restart')" (click)="containerAction(container, 'restart')"><mat-icon>restart_alt</mat-icon></button>
+                      <button mat-icon-button color="warn" aria-label="Kill container" matTooltip="Kill" [disabled]="!canContainerAction(container, 'kill')" (click)="containerAction(container, 'kill')"><mat-icon>dangerous</mat-icon></button>
+                      <button mat-icon-button color="warn" aria-label="Delete container" matTooltip="Delete" [disabled]="!canContainerAction(container, 'delete')" (click)="containerAction(container, 'delete')"><mat-icon>delete</mat-icon></button>
                     </div>
                   </article>
                 } @empty {

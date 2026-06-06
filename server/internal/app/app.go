@@ -137,6 +137,7 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/system/status", a.withSession(a.handleSystemStatus))
 	mux.HandleFunc("POST /api/auth/login", a.handlePasswordLogin)
 	mux.HandleFunc("POST /api/auth/login-agent-token", a.handleAgentTokenLogin)
+	mux.HandleFunc("POST /api/auth/change-password", a.withSession(a.handleChangePassword))
 	mux.HandleFunc("POST /api/auth/passkeys/login/begin", a.handleBeginPasskeyLogin)
 	mux.HandleFunc("POST /api/auth/passkeys/login/finish", a.handleFinishPasskeyLogin)
 	mux.HandleFunc("GET /api/auth/passkeys", a.withSession(a.handleListPasskeys))
@@ -241,8 +242,44 @@ func (a *App) handlePasswordLogin(w http.ResponseWriter, r *http.Request) {
 	a.setSessionCookie(w, created.SessionID, created.Session.ExpiresAt)
 	a.audit(r, user.ID, "auth.login.password", "user", user.ID, "success", nil)
 	api.WriteOK(r.Context(), w, map[string]any{
-		"user":       map[string]any{"id": user.ID, "username": user.Username, "session_type": "admin_password"},
+		"user":       a.currentUserPayload(r.Context(), user.ID, user.Username, "admin_password", ""),
 		"csrf_token": created.CSRFToken,
+	})
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+func (a *App) handleChangePassword(w http.ResponseWriter, r *http.Request, session db.Session) {
+	if !a.requireCSRF(w, r) {
+		return
+	}
+	if !a.requireAdminPasswordSession(w, r, session) {
+		return
+	}
+	var req changePasswordRequest
+	if !decodeJSON(r, w, &req) {
+		return
+	}
+	if !a.verifyAdminPassword(r.Context(), req.CurrentPassword) {
+		a.audit(r, session.UserID, "auth.password.change", "user", session.UserID, "failure", map[string]any{"reason": "current_password_invalid"})
+		api.WriteError(r.Context(), w, http.StatusForbidden, "ADMIN_PASSWORD_INVALID", "Current admin password is invalid.", nil)
+		return
+	}
+	if message := a.validateNewAdminPassword(req.NewPassword, req.CurrentPassword); message != "" {
+		api.WriteError(r.Context(), w, http.StatusBadRequest, "PASSWORD_INVALID", message, nil)
+		return
+	}
+	if err := a.store.UpdateUserPassword(r.Context(), db.DefaultAdminUsername, req.NewPassword); err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	a.audit(r, session.UserID, "auth.password.change", "user", session.UserID, "success", nil)
+	api.WriteOK(r.Context(), w, map[string]any{
+		"changed": true,
+		"user":    a.currentUserPayload(r.Context(), session.UserID, session.Username, session.SessionType, session.AgentID),
 	})
 }
 
@@ -308,14 +345,75 @@ func (a *App) handleMe(w http.ResponseWriter, r *http.Request, session db.Sessio
 		return
 	}
 	api.WriteOK(r.Context(), w, map[string]any{
-		"user": map[string]any{
-			"id":           session.UserID,
-			"username":     session.Username,
-			"session_type": session.SessionType,
-			"agent_id":     session.AgentID,
-		},
+		"user":       a.currentUserPayload(r.Context(), session.UserID, session.Username, session.SessionType, session.AgentID),
 		"csrf_token": csrfToken,
 	})
+}
+
+func (a *App) currentUserPayload(ctx context.Context, userID string, username string, sessionType string, agentID string) map[string]any {
+	payload := map[string]any{
+		"id":           userID,
+		"username":     username,
+		"session_type": sessionType,
+		"agent_id":     agentID,
+	}
+	if !isAdminSessionType(sessionType) || userID != db.DefaultAdminUsername {
+		return payload
+	}
+	status := a.adminPasswordStatus(ctx)
+	payload["password_change_required"] = status["required"]
+	payload["password_change_reasons"] = status["reasons"]
+	payload["using_configured_password"] = status["using_configured_password"]
+	payload["passkeys_registered"] = status["passkeys_registered"]
+	return payload
+}
+
+func (a *App) adminPasswordStatus(ctx context.Context) map[string]any {
+	reasons := []string{}
+	usingConfiguredPassword := false
+	passkeysRegistered := 0
+	user, err := a.store.FindUserByUsername(ctx, db.DefaultAdminUsername)
+	if err == nil {
+		usingConfiguredPassword = auth.VerifyPassword(a.configuredAdminPassword(), user.PasswordHash)
+		if usingConfiguredPassword {
+			reasons = append(reasons, "configured_password")
+		}
+	}
+	if count, err := a.store.CountPasskeyCredentials(ctx, db.DefaultAdminUsername); err == nil {
+		passkeysRegistered = count
+		if count == 0 {
+			reasons = append(reasons, "no_passkey")
+		}
+	}
+	return map[string]any{
+		"required":                  len(reasons) > 0,
+		"reasons":                   reasons,
+		"using_configured_password": usingConfiguredPassword,
+		"passkeys_registered":       passkeysRegistered,
+	}
+}
+
+func (a *App) configuredAdminPassword() string {
+	if a.cfg.Auth.AdminPassword != "" {
+		return a.cfg.Auth.AdminPassword
+	}
+	return db.DefaultAdminPassword
+}
+
+func (a *App) validateNewAdminPassword(newPassword string, currentPassword string) string {
+	if strings.TrimSpace(newPassword) == "" {
+		return "New admin password cannot be empty."
+	}
+	if len(newPassword) < 12 {
+		return "New admin password must be at least 12 characters."
+	}
+	if newPassword == currentPassword {
+		return "New admin password must be different from the current password."
+	}
+	if newPassword == a.configuredAdminPassword() {
+		return "New admin password must be different from the configured bootstrap password."
+	}
+	return ""
 }
 
 func (a *App) handleListAgents(w http.ResponseWriter, r *http.Request, _ db.Session) {

@@ -21,6 +21,7 @@ const (
 	PrimaryLinuxUID      = 1000
 	PrimaryAgentSocket   = "/run/user/1000/podorel/podorel-agent.sock"
 	DefaultAdminUsername = "admin"
+	DefaultAdminPassword = "podorel-development-password"
 )
 
 type Store struct {
@@ -273,7 +274,7 @@ func (s *Store) Bootstrap(ctx context.Context, adminPassword string) error {
 func (s *Store) BootstrapWithOptions(ctx context.Context, opts BootstrapOptions) error {
 	adminPassword := opts.AdminPassword
 	if adminPassword == "" {
-		adminPassword = "podorel-development-password"
+		adminPassword = DefaultAdminPassword
 	}
 	primarySocketPath := opts.PrimaryAgentSocketPath
 	if primarySocketPath == "" {
@@ -333,6 +334,28 @@ func (s *Store) FindUserByID(ctx context.Context, userID string) (User, error) {
 	return user, nil
 }
 
+func (s *Store) UpdateUserPassword(ctx context.Context, userID string, password string) error {
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE users
+		SET password_hash = ?, updated_at = ?
+		WHERE id = ?`, hash, s.now(), userID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *Store) ListPasskeyCredentials(ctx context.Context, userID string) ([]PasskeyCredential, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, user_id, credential_id, name, credential_json, created_at, updated_at, COALESCE(last_used_at, '')
@@ -352,6 +375,14 @@ func (s *Store) ListPasskeyCredentials(ctx context.Context, userID string) ([]Pa
 		credentials = append(credentials, credential)
 	}
 	return credentials, rows.Err()
+}
+
+func (s *Store) CountPasskeyCredentials(ctx context.Context, userID string) (int, error) {
+	var count int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM passkey_credentials WHERE user_id = ?`, userID).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
 func (s *Store) SavePasskeyCredential(ctx context.Context, userID string, name string, credentialID string, credentialJSON string) (PasskeyCredential, error) {

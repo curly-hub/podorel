@@ -574,7 +574,7 @@ export class TemplatesPageComponent implements OnInit {
 
   private async copyText(value: string, success: string): Promise<void> {
     try {
-      await navigator.clipboard.writeText(value);
+      await this.writeClipboard(value);
       this.snackBar.open(success, 'Dismiss', { duration: 2500 });
     } catch {
       this.snackBar.open('Copy failed; select the text manually.', 'Dismiss', { duration: 4000 });
@@ -587,8 +587,36 @@ export class TemplatesPageComponent implements OnInit {
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = filename;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
     anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  private async writeClipboard(value: string): Promise<void> {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return;
+      } catch {
+        // Fall back for HTTP, older browsers, or denied clipboard permissions.
+      }
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = value;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-1000px';
+    textarea.style.left = '-1000px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const copied = document.execCommand('copy');
+    textarea.remove();
+    if (!copied) {
+      throw new Error('clipboard copy failed');
+    }
   }
 
   private keyValues(input: string): Record<string, string> {
