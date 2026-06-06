@@ -237,7 +237,7 @@ func (r *PodmanSocketRuntime) Logs(ctx context.Context, req LogRequest) (<-chan 
 		}()
 		return ch, nil
 	}
-	path := "/libpod/containers/" + url.PathEscape(target) + "/logs?stdout=true&stderr=true"
+	path := "/libpod/containers/" + url.PathEscape(target) + "/logs?stdout=true&stderr=true&timestamps=true"
 	if req.LastLines > 0 {
 		path += "&tail=" + url.QueryEscape(fmt.Sprintf("%d", req.LastLines))
 	}
@@ -250,7 +250,7 @@ func (r *PodmanSocketRuntime) Logs(ctx context.Context, req LogRequest) (<-chan 
 		defer close(ch)
 		for _, line := range strings.Split(string(raw), "\n") {
 			if strings.TrimSpace(line) != "" {
-				ch <- LogLine{Source: target, Line: line}
+				ch <- parsePodmanLogLine(target, line)
 			}
 		}
 	}()

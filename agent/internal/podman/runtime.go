@@ -2,6 +2,7 @@ package podman
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -81,6 +82,22 @@ type LogLine struct {
 	Timestamp time.Time
 	Source    string
 	Line      string
+}
+
+func parsePodmanLogLine(source string, raw string) LogLine {
+	raw = strings.TrimRight(raw, "\r")
+	timestampText, message, ok := strings.Cut(raw, " ")
+	if !ok {
+		if timestamp, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+			return LogLine{Timestamp: timestamp, Source: source}
+		}
+		return LogLine{Source: source, Line: raw}
+	}
+	timestamp, err := time.Parse(time.RFC3339Nano, timestampText)
+	if err != nil {
+		return LogLine{Source: source, Line: raw}
+	}
+	return LogLine{Timestamp: timestamp, Source: source, Line: message}
 }
 
 type ExecRequest struct {

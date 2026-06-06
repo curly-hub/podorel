@@ -6,6 +6,7 @@ After=network.target
 Type=notify
 NotifyAccess=main
 ExecStart=%h/.local/bin/podorel-agent --production
+KillMode=process
 Restart=always
 RestartSec=2s
 WatchdogSec=30s

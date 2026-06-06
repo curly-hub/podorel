@@ -167,7 +167,7 @@ func (r *PodmanCLIRuntime) DeleteContainer(ctx context.Context, containerID stri
 }
 
 func (r *PodmanCLIRuntime) Logs(ctx context.Context, req LogRequest) (<-chan LogLine, error) {
-	args := []string{"logs"}
+	args := []string{"logs", "--timestamps"}
 	if req.Follow {
 		args = append(args, "--follow")
 	}
@@ -193,7 +193,7 @@ func (r *PodmanCLIRuntime) Logs(ctx context.Context, req LogRequest) (<-chan Log
 		defer close(ch)
 		scanner := bufio.NewScanner(bytes.NewReader(out))
 		for scanner.Scan() {
-			ch <- LogLine{Source: target, Line: scanner.Text()}
+			ch <- parsePodmanLogLine(target, scanner.Text())
 		}
 	}()
 	return ch, nil
