@@ -216,6 +216,7 @@ export interface PodTemplate {
   restart_policy: string;
   labels: Record<string, string>;
   ui_notes: string[];
+  custom?: boolean;
 }
 
 export interface ComposeStackService {

@@ -158,7 +158,8 @@ Covered UI:
 - Type filter options: `Pod templates`, `Compose stacks`, `All`
 - Catalog buttons: `Use`, `Deploy`, `Create Pod`
 - Pod catalog draft toggle and labels: `ID`, `Name`, `Description`, `Image`, `Host port`, `Container port`, `CPU`, `Memory`, `Restart policy`, `Command lines`, `Environment lines`, `Notes`
-- Pod catalog draft buttons: `Copy JSON`, `Download`
+- Pod catalog draft buttons: `Save template`, `Copy JSON`, `Download`
+- Saved custom template catalog state, `Use`, and `Delete`
 - Compose catalog draft toggle
 - Compose presets: `Web`, `Web + DB`, `API + Redis`, `Blank`
 - Compose catalog labels: `Stack ID`, `Name`, `Version`, `Description`, `docker-compose.yml`, `Env files`, `Required files`, `Labels`, `Notes`
@@ -170,15 +171,17 @@ Covered UI:
 - Template deploy buttons: `Preview`, `Create Pod`
 - Compose deploy labels: `Compose stack`, `Project name`, `Target agent`, `Find stack`
 - Compose deploy buttons: `Preview Stack`, `Deploy Stack`
-- Image build labels: `Image name`, `Target agent`, `Dockerfile`, `Password confirmation`
+- Image build labels: `Image name`, `Target agent`, `Dockerfile`, `Admin password confirmation`
 - Image build buttons: `Preview Build`, `Build Image`
-- Secret labels: `Secret name`, `Used by pod`, `Target agent`, `Password confirmation`, `Secret value`
+- Secret labels: `Secret name`, `Used by pod`, `Target agent`, `Admin password confirmation`, `Secret value`
 - Secret button: `Create Secret`
 - Secret value clearing after create
 
 Covered APIs and sockets:
 
 - `GET /api/templates`
+- `POST /api/templates`
+- `DELETE /api/templates/:id`
 - `GET /api/compose-stacks`
 - `POST /api/pods/create-from-template`
 - `POST /api/compose-stacks/deploy`

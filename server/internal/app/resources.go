@@ -351,7 +351,77 @@ func (a *App) handleStatsHistory(w http.ResponseWriter, r *http.Request, session
 }
 
 func (a *App) handleTemplates(w http.ResponseWriter, r *http.Request, _ db.Session) {
-	api.WriteOK(r.Context(), w, a.templates)
+	loaded, err := a.allTemplates(r.Context())
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	api.WriteOK(r.Context(), w, loaded)
+}
+
+func (a *App) handleSaveTemplate(w http.ResponseWriter, r *http.Request, session db.Session) {
+	if !a.requireAdminPasswordSession(w, r, session) || !a.requireCSRF(w, r) {
+		return
+	}
+	var template templates.Template
+	if !decodeJSON(r, w, &template) {
+		return
+	}
+	template.Normalize()
+	template.ID = strings.TrimSpace(template.ID)
+	if !validTemplateID(template.ID) {
+		api.WriteError(r.Context(), w, http.StatusBadRequest, "TEMPLATE_INVALID", "Template ID may contain only letters, numbers, dots, underscores, and dashes.", nil)
+		return
+	}
+	if _, ok := a.builtInTemplateByID(template.ID); ok {
+		api.WriteError(r.Context(), w, http.StatusConflict, "TEMPLATE_BUILT_IN", "Built-in templates cannot be overwritten.", nil)
+		return
+	}
+	if err := template.Validate(); err != nil {
+		api.WriteError(r.Context(), w, http.StatusBadRequest, "TEMPLATE_INVALID", err.Error(), nil)
+		return
+	}
+	template.Custom = true
+	manifest, err := json.Marshal(template)
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	saved, err := a.store.UpsertCustomPodTemplate(r.Context(), db.CustomPodTemplate{
+		ID:           template.ID,
+		ManifestJSON: string(manifest),
+	})
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
+	a.audit(r, session.UserID, "templates.save", "template", template.ID, "success", nil)
+	api.WriteOK(r.Context(), w, map[string]any{
+		"template":   template,
+		"created_at": saved.CreatedAt,
+		"updated_at": saved.UpdatedAt,
+	})
+}
+
+func (a *App) handleDeleteTemplate(w http.ResponseWriter, r *http.Request, session db.Session) {
+	if !a.requireAdminPasswordSession(w, r, session) || !a.requireCSRF(w, r) {
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if _, ok := a.builtInTemplateByID(id); ok {
+		api.WriteError(r.Context(), w, http.StatusConflict, "TEMPLATE_BUILT_IN", "Built-in templates cannot be deleted.", nil)
+		return
+	}
+	if err := a.store.DeleteCustomPodTemplate(r.Context(), id); err != nil {
+		if err == db.ErrNotFound {
+			api.WriteError(r.Context(), w, http.StatusNotFound, "TEMPLATE_NOT_FOUND", "Template was not found.", nil)
+			return
+		}
+		a.internalError(w, r, err)
+		return
+	}
+	a.audit(r, session.UserID, "templates.delete", "template", id, "success", nil)
+	api.WriteOK(r.Context(), w, map[string]any{"deleted": true, "template_id": id})
 }
 
 type createFromTemplateRequest struct {
@@ -370,12 +440,15 @@ func (a *App) handleCreateFromTemplate(w http.ResponseWriter, r *http.Request, s
 	if !decodeJSON(r, w, &req) {
 		return
 	}
-	template, ok := a.templateByID(req.TemplateID)
+	template, ok, err := a.templateByID(r.Context(), req.TemplateID)
+	if err != nil {
+		a.internalError(w, r, err)
+		return
+	}
 	if !ok {
 		api.WriteError(r.Context(), w, http.StatusNotFound, "TEMPLATE_NOT_FOUND", "Template was not found.", nil)
 		return
 	}
-	var err error
 	template, err = applyTemplateValues(template, req.Values)
 	if err != nil {
 		api.WriteError(r.Context(), w, http.StatusBadRequest, "TEMPLATE_VALUES_INVALID", err.Error(), nil)
@@ -616,13 +689,63 @@ func (a *App) handleUpdateSettings(w http.ResponseWriter, r *http.Request, sessi
 	api.WriteOK(r.Context(), w, map[string]any{"updated": updated, "requires_restart": requiresRestart, "effective_settings": a.cfg})
 }
 
-func (a *App) templateByID(id string) (templates.Template, bool) {
+func (a *App) allTemplates(ctx context.Context) ([]templates.Template, error) {
+	loaded := append([]templates.Template(nil), a.templates...)
+	customTemplates, err := a.customTemplates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	loaded = append(loaded, customTemplates...)
+	sort.Slice(loaded, func(i, j int) bool {
+		return loaded[i].ID < loaded[j].ID
+	})
+	return loaded, nil
+}
+
+func (a *App) customTemplates(ctx context.Context) ([]templates.Template, error) {
+	records, err := a.store.ListCustomPodTemplates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	loaded := make([]templates.Template, 0, len(records))
+	for _, record := range records {
+		var template templates.Template
+		if err := json.Unmarshal([]byte(record.ManifestJSON), &template); err != nil {
+			return nil, fmt.Errorf("custom template %s: %w", record.ID, err)
+		}
+		template.Normalize()
+		if err := template.Validate(); err != nil {
+			return nil, fmt.Errorf("custom template %s: %w", record.ID, err)
+		}
+		template.Custom = true
+		loaded = append(loaded, template)
+	}
+	return loaded, nil
+}
+
+func (a *App) builtInTemplateByID(id string) (templates.Template, bool) {
 	for _, template := range a.templates {
 		if template.ID == id {
 			return template, true
 		}
 	}
 	return templates.Template{}, false
+}
+
+func (a *App) templateByID(ctx context.Context, id string) (templates.Template, bool, error) {
+	if template, ok := a.builtInTemplateByID(id); ok {
+		return template, true, nil
+	}
+	customTemplates, err := a.customTemplates(ctx)
+	if err != nil {
+		return templates.Template{}, false, err
+	}
+	for _, template := range customTemplates {
+		if template.ID == id {
+			return template, true, nil
+		}
+	}
+	return templates.Template{}, false, nil
 }
 
 func (a *App) podByNameObservedAfter(ctx context.Context, agentID string, name string, observedAfter time.Time) (db.Pod, bool) {
@@ -797,6 +920,13 @@ func validTemplateValueKey(key string) bool {
 		return false
 	}
 	return true
+}
+
+func validTemplateID(id string) bool {
+	if id == "" || len(id) > 80 {
+		return false
+	}
+	return validTemplateValueKey(id)
 }
 
 func sortedStringMapKeys(values map[string]string) []string {

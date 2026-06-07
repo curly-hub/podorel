@@ -156,6 +156,9 @@
   color: var(--text-soft);
   font-size: 12px;
   line-height: 1.4;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .catalog-card p {
@@ -199,12 +202,35 @@ dd {
 
 .catalog-card mat-chip-set {
   align-content: start;
+  max-width: 100%;
+  min-width: 0;
+}
+
+:host ::ng-deep .catalog-card mat-chip {
+  height: auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+:host ::ng-deep .catalog-card mat-chip .mdc-evolution-chip__action,
+:host ::ng-deep .catalog-card mat-chip .mdc-evolution-chip__cell,
+:host ::ng-deep .catalog-card mat-chip .mat-mdc-chip-action-label {
+  min-width: 0;
+  max-width: 100%;
+}
+
+:host ::ng-deep .catalog-card mat-chip .mat-mdc-chip-action-label {
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .catalog-card footer {
   align-items: center;
   border-top: 1px solid var(--border);
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
   padding-top: 10px;
 }

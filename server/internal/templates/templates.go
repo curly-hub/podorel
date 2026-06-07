@@ -27,6 +27,7 @@ type Template struct {
 	RestartPolicy  string            `json:"restart_policy"`
 	Labels         map[string]string `json:"labels"`
 	UINotes        []string          `json:"ui_notes"`
+	Custom         bool              `json:"custom,omitempty"`
 }
 
 type Port struct {

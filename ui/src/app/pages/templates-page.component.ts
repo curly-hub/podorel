@@ -68,6 +68,8 @@ export class TemplatesPageComponent implements OnInit {
   search = '';
   filter: CatalogFilter = 'all';
   draftMode: DraftMode = 'pod';
+  savingDraft = false;
+  deletingTemplateId = '';
   draft: TemplateDraft = {
     id: 'custom-web',
     version: '1.0.0',
@@ -298,6 +300,38 @@ export class TemplatesPageComponent implements OnInit {
 
   downloadDraftManifest(): void {
     this.downloadText(`${this.safeId(this.draft.id)}.json`, this.draftManifest(), 'application/json');
+  }
+
+  async saveDraftTemplate(): Promise<void> {
+    this.savingDraft = true;
+    try {
+      const saved = await this.api.saveTemplate(this.draftTemplate());
+      this.templates.update((templates) => [
+        ...templates.filter((template) => template.id !== saved.id),
+        saved
+      ].sort((left, right) => left.id.localeCompare(right.id)));
+      this.snackBar.open(`Saved ${saved.name}.`, 'Dismiss', { duration: 3000 });
+    } catch (error) {
+      this.snackBar.open(this.formatError(error), 'Dismiss', { duration: 5000 });
+    } finally {
+      this.savingDraft = false;
+    }
+  }
+
+  async deleteTemplate(template: PodTemplate): Promise<void> {
+    if (!template.custom || this.deletingTemplateId) {
+      return;
+    }
+    this.deletingTemplateId = template.id;
+    try {
+      await this.api.deleteTemplate(template.id);
+      this.templates.update((templates) => templates.filter((item) => item.id !== template.id));
+      this.snackBar.open(`Deleted ${template.name}.`, 'Dismiss', { duration: 3000 });
+    } catch (error) {
+      this.snackBar.open(this.formatError(error), 'Dismiss', { duration: 5000 });
+    } finally {
+      this.deletingTemplateId = '';
+    }
   }
 
   composeManifest(): string {

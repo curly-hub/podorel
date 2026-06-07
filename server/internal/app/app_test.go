@@ -432,6 +432,89 @@ func TestTemplatesSecuritySecretsAndAudit(t *testing.T) {
 	}
 }
 
+func TestCustomTemplateSaveListCreateAndDelete(t *testing.T) {
+	harness := newTestHarness(t)
+	login := harness.login(t)
+	manifest := `{
+		"id":"custom-nginx-e2e",
+		"version":"1.0.0",
+		"name":"Custom Nginx E2E",
+		"description":"Saved custom template.",
+		"image":"docker.io/library/nginx:1.27-alpine",
+		"command":[],
+		"ports":[{"host":18090,"container":80,"protocol":"tcp"}],
+		"volumes":[],
+		"environment":{"E2E":"true"},
+		"secrets":[],
+		"health_command":[],
+		"resource_limits":{"cpu":"0.25","memory":"128MiB"},
+		"restart_policy":"unless-stopped",
+		"labels":{"io.podorel.template":"custom-nginx-e2e"},
+		"ui_notes":["Saved from test."]
+	}`
+
+	req := jsonRequest(http.MethodPost, "/api/templates", manifest)
+	req.AddCookie(login.Cookie)
+	rec := httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("save without csrf status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/templates", manifest)
+	req.AddCookie(login.Cookie)
+	req.Header.Set(csrfHeaderName, login.CSRFToken)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"custom":true`) {
+		t.Fatalf("save template status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/templates", strings.Replace(manifest, `"custom-nginx-e2e"`, `"alpine-nodejs"`, 1))
+	req.AddCookie(login.Cookie)
+	req.Header.Set(csrfHeaderName, login.CSRFToken)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "TEMPLATE_BUILT_IN") {
+		t.Fatalf("built-in overwrite status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/templates", nil)
+	req.AddCookie(login.Cookie)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "custom-nginx-e2e") {
+		t.Fatalf("templates after save = %d %s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/pods/create-from-template", `{"template_id":"custom-nginx-e2e","pod_name":"custom-nginx-demo"}`)
+	req.AddCookie(login.Cookie)
+	req.Header.Set(csrfHeaderName, login.CSRFToken)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "18090:80/tcp") || !strings.Contains(rec.Body.String(), "custom-nginx-e2e") {
+		t.Fatalf("custom template preview = %d %s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodDelete, "/api/templates/custom-nginx-e2e", `{}`)
+	req.AddCookie(login.Cookie)
+	req.Header.Set(csrfHeaderName, login.CSRFToken)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("delete template status = %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	req = jsonRequest(http.MethodPost, "/api/pods/create-from-template", `{"template_id":"custom-nginx-e2e","pod_name":"custom-nginx-demo"}`)
+	req.AddCookie(login.Cookie)
+	req.Header.Set(csrfHeaderName, login.CSRFToken)
+	rec = httptest.NewRecorder()
+	harness.handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), "TEMPLATE_NOT_FOUND") {
+		t.Fatalf("deleted custom template create status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestSecurityScanUnavailableIsExplicitSetupState(t *testing.T) {
 	harness := newTestHarnessWithOptions(t, Options{})
 	harness.app.cfg.Security.Scanner = "podorel-test-missing-scanner"

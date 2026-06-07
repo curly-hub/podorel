@@ -343,6 +343,7 @@ function routeJSON(route, data) {
 
 async function installFixtureRoutes(page) {
   let passkeys = [passkey];
+  let podTemplates = [redisTemplate];
 
   if (typeof page.routeWebSocket === 'function') {
     await page.routeWebSocket('**/api/ws/logs**', (ws) => {
@@ -504,7 +505,32 @@ async function installFixtureRoutes(page) {
     }
     await route.fallback();
   });
-  await page.route('**/api/templates', (route) => routeJSON(route, [redisTemplate]));
+  await page.route('**/api/templates', async (route) => {
+    if (route.request().method() === 'GET') {
+      await routeJSON(route, podTemplates);
+      return;
+    }
+    if (route.request().method() === 'POST') {
+      const template = JSON.parse(route.request().postData() || '{}');
+      template.custom = true;
+      podTemplates = [
+        ...podTemplates.filter((item) => item.id !== template.id),
+        template
+      ].sort((left, right) => left.id.localeCompare(right.id));
+      await routeJSON(route, { template, updated_at: now });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route('**/api/templates/*', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      const id = decodeURIComponent(route.request().url().split('/').pop() || '');
+      podTemplates = podTemplates.filter((item) => item.id !== id);
+      await routeJSON(route, { deleted: true, template_id: id });
+      return;
+    }
+    await route.fallback();
+  });
   await page.route('**/api/compose-stacks', async (route) => {
     if (route.request().method() === 'GET') {
       await routeJSON(route, [redisComposeStack]);

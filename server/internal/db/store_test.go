@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -108,6 +109,55 @@ func TestUpdateUserPasswordAndPasskeyCount(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("passkey count after save = %d, want 1", count)
+	}
+}
+
+func TestCustomPodTemplateLifecycle(t *testing.T) {
+	store := testStore(t)
+	ctx := context.Background()
+	if err := store.Bootstrap(ctx, "secret-password"); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := store.UpsertCustomPodTemplate(ctx, CustomPodTemplate{
+		ID:           "custom-nginx",
+		ManifestJSON: `{"id":"custom-nginx","name":"Custom Nginx"}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.CreatedAt.IsZero() || saved.UpdatedAt.IsZero() {
+		t.Fatalf("saved template timestamps missing: %#v", saved)
+	}
+	templates, err := store.ListCustomPodTemplates(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(templates) != 1 || templates[0].ID != "custom-nginx" || templates[0].ManifestJSON == "" {
+		t.Fatalf("templates = %#v", templates)
+	}
+
+	updated, err := store.UpsertCustomPodTemplate(ctx, CustomPodTemplate{
+		ID:           "custom-nginx",
+		ManifestJSON: `{"id":"custom-nginx","name":"Updated Nginx"}`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.UpdatedAt.Before(saved.UpdatedAt) {
+		t.Fatalf("updated timestamp moved backwards: saved=%s updated=%s", saved.UpdatedAt, updated.UpdatedAt)
+	}
+	templates, err = store.ListCustomPodTemplates(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(templates) != 1 || !strings.Contains(templates[0].ManifestJSON, "Updated Nginx") {
+		t.Fatalf("updated templates = %#v", templates)
+	}
+	if err := store.DeleteCustomPodTemplate(ctx, "custom-nginx"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteCustomPodTemplate(ctx, "custom-nginx"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("delete missing template err = %v, want ErrNotFound", err)
 	}
 }
 

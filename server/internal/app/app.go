@@ -183,6 +183,8 @@ func (a *App) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/security/host-updates", a.withSession(a.handleHostPackageUpdates))
 
 	mux.HandleFunc("GET /api/templates", a.withSession(a.handleTemplates))
+	mux.HandleFunc("POST /api/templates", a.withSession(a.handleSaveTemplate))
+	mux.HandleFunc("DELETE /api/templates/{id}", a.withSession(a.handleDeleteTemplate))
 	mux.HandleFunc("POST /api/pods/create-from-template", a.withSession(a.handleCreateFromTemplate))
 	mux.HandleFunc("GET /api/compose-stacks", a.withSession(a.handleComposeStacks))
 	mux.HandleFunc("POST /api/compose-stacks/deploy", a.withSession(a.handleDeployComposeStack))

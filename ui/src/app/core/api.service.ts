@@ -250,6 +250,15 @@ export class ApiService {
     return templates.map((template) => this.normalizePodTemplate(template));
   }
 
+  async saveTemplate(template: PodTemplate): Promise<PodTemplate> {
+    const response = await this.post<{ template: PodTemplate }>('/api/templates', template);
+    return this.normalizePodTemplate(response.template);
+  }
+
+  deleteTemplate(templateId: string): Promise<Record<string, unknown>> {
+    return this.delete<Record<string, unknown>>(`/api/templates/${encodeURIComponent(templateId)}`, {});
+  }
+
   async composeStacks(): Promise<ComposeStack[]> {
     const stacks = await this.get<ComposeStack[]>('/api/compose-stacks');
     return stacks.map((stack) => this.normalizeComposeStack(stack));

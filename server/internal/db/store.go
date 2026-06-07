@@ -211,6 +211,13 @@ type SecretMetadata struct {
 	CreatedAt         time.Time `json:"created_at"`
 }
 
+type CustomPodTemplate struct {
+	ID           string    `json:"id"`
+	ManifestJSON string    `json:"manifest_json"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type DebugTrace struct {
 	ID            int64          `json:"id"`
 	CreatedAt     time.Time      `json:"created_at"`
@@ -1042,6 +1049,57 @@ func (s *Store) ListSecretsMetadata(ctx context.Context) ([]SecretMetadata, erro
 		secrets = append(secrets, secret)
 	}
 	return secrets, rows.Err()
+}
+
+func (s *Store) ListCustomPodTemplates(ctx context.Context) ([]CustomPodTemplate, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, manifest_json, created_at, updated_at FROM custom_pod_templates ORDER BY id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var templates []CustomPodTemplate
+	for rows.Next() {
+		var template CustomPodTemplate
+		var created, updated string
+		if err := rows.Scan(&template.ID, &template.ManifestJSON, &created, &updated); err != nil {
+			return nil, err
+		}
+		template.CreatedAt, _ = parseTime(created)
+		template.UpdatedAt, _ = parseTime(updated)
+		templates = append(templates, template)
+	}
+	return templates, rows.Err()
+}
+
+func (s *Store) UpsertCustomPodTemplate(ctx context.Context, template CustomPodTemplate) (CustomPodTemplate, error) {
+	now := s.now()
+	if template.CreatedAt.IsZero() {
+		template.CreatedAt = now
+	}
+	template.UpdatedAt = now
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO custom_pod_templates(id, manifest_json, created_at, updated_at)
+		VALUES(?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			manifest_json = excluded.manifest_json,
+			updated_at = excluded.updated_at`,
+		template.ID, template.ManifestJSON, template.CreatedAt, template.UpdatedAt)
+	return template, err
+}
+
+func (s *Store) DeleteCustomPodTemplate(ctx context.Context, id string) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM custom_pod_templates WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) AddDebugTrace(ctx context.Context, trace DebugTrace) error {
